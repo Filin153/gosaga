@@ -1,0 +1,15 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: false
+
+linters:
+  default: all
+
+  enable:
+    - govet # базовые проверки Go
+    - staticcheck # "умный" анализ
+    - unused # неиспользуемые переменные/функции/типы
+    - ineffassign # присваивания без использования
+    - errcheck # пропущенные проверки ошибок
