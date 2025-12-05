@@ -2,6 +2,7 @@ package gosaga
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"log/slog"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/IBM/sarama"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,7 +22,7 @@ type txBeginner interface {
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
 }
 
-type Saga[T any] struct {
+type Saga struct {
 	pool           txBeginner
 	inTaskRepo     database.TaskRepository
 	outTaskRepo    database.TaskRepository
@@ -30,8 +32,17 @@ type Saga[T any] struct {
 	kafkaWriter    kafka.Writer
 }
 
-func NewSaga[T any](ctx context.Context, pool *pgxpool.Pool, readerGroup string, readerTopics, hosts []string, conf *sarama.Config) (*Saga[T], error) {
+//go:embed pg-migration.sql
+var migrationSQL string
+
+func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, readerTopics, hosts []string, conf *sarama.Config) (*Saga, error) {
 	slog.Info("Saga.NewSaga: start")
+
+	if err := runMigration(ctx, pool); err != nil {
+		slog.Error("Saga.NewSaga: migration error", "error", err.Error())
+		return nil, err
+	}
+
 	kafkaWriter, err := kafka.NewKafkaWriter(hosts, conf)
 	if err != nil {
 		slog.Error("Saga.NewSaga: NewKafkaWriter error", "error", err.Error())
@@ -47,7 +58,7 @@ func NewSaga[T any](ctx context.Context, pool *pgxpool.Pool, readerGroup string,
 	kafkaReader.Run(ctx)
 
 	slog.Info("Saga.NewSaga: success")
-	return &Saga[T]{
+	return &Saga{
 		pool:           pool,
 		inTaskRepo:     pg.NewInTaskRepository(ctx, pool),
 		outTaskRepo:    pg.NewOutTaskRepository(ctx, pool),
@@ -60,7 +71,7 @@ func NewSaga[T any](ctx context.Context, pool *pgxpool.Pool, readerGroup string,
 
 // Добавить алгоритм распределдения ресурсов чтобы небыло голодания
 // limiter для каждого из потоков, limiter * 4 = Все потоки
-func (s *Saga[T]) RunWorkers(ctx context.Context, limiter int, outWorker WorkerInterface, inWorker WorkerInterface) error {
+func (s *Saga) RunWorkers(ctx context.Context, limiter int, outWorker WorkerInterface, inWorker WorkerInterface) error {
 	slog.Info("Saga.RunWorkers: start", "limiter", limiter)
 	OutTaskWorkerCountLimiter := make(chan struct{}, limiter)
 	dlqOutTaskWorkerCountLimiter := make(chan struct{}, limiter)
@@ -252,7 +263,7 @@ func (s *Saga[T]) RunWorkers(ctx context.Context, limiter int, outWorker WorkerI
 	return nil
 }
 
-func (s *Saga[T]) Write(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollbackFunc func()) (err error) {
+func (s *Saga) Write(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollbackFunc func()) (err error) {
 	defer func() {
 		if err != nil {
 			slog.Error("Saga.Write: error, calling rollback", "error", err.Error())
@@ -298,7 +309,7 @@ func (s *Saga[T]) Write(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *d
 	return nil
 }
 
-func (s *Saga[T]) AsyncWrite(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollbackFunc func()) (err error) {
+func (s *Saga) AsyncWrite(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollbackFunc func()) (err error) {
 	defer func() {
 		if err != nil {
 			slog.Error("Saga.AsyncWrite: early error, calling rollback", "error", err.Error())
@@ -350,4 +361,11 @@ func (s *Saga[T]) AsyncWrite(ctx context.Context, msg *domain.SagaMsg, rollbackM
 	}(rollbackPayload)
 
 	return nil
+}
+
+func runMigration(ctx context.Context, execer interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+}) error {
+	_, err := execer.Exec(ctx, migrationSQL)
+	return err
 }

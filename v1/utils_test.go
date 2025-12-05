@@ -40,7 +40,7 @@ func TestUnmarshal_InvalidJSON(t *testing.T) {
 }
 
 func TestGenerateIdempotencyKey(t *testing.T) {
-	var s Saga[struct{}]
+	var s Saga
 
 	key1, err := s.generateIdempotencyKey()
 	if err != nil {

@@ -96,7 +96,7 @@ func TestInWork_Success(t *testing.T) {
 	taskRepo := dbmocks.NewMockTaskRepository(t)
 	dlqRepo := dbmocks.NewMockDLQRepository(t)
 
-	s := &Saga[struct{}]{
+	s := &Saga{
 		pool:          pool,
 		inTaskRepo:    taskRepo,
 		dlqInTaskRepo: dlqRepo,
@@ -141,7 +141,7 @@ func TestInWork_ErrorCreatesDLQ(t *testing.T) {
 	taskRepo := dbmocks.NewMockTaskRepository(t)
 	dlqRepo := dbmocks.NewMockDLQRepository(t)
 
-	s := &Saga[struct{}]{
+	s := &Saga{
 		pool:          pool,
 		inTaskRepo:    taskRepo,
 		dlqInTaskRepo: dlqRepo,
@@ -188,7 +188,7 @@ func TestOutWork_Success(t *testing.T) {
 	taskRepo := dbmocks.NewMockTaskRepository(t)
 	dlqRepo := dbmocks.NewMockDLQRepository(t)
 
-	s := &Saga[struct{}]{
+	s := &Saga{
 		pool:           pool,
 		outTaskRepo:    taskRepo,
 		dlqOutTaskRepo: dlqRepo,
@@ -225,7 +225,7 @@ func TestOutWork_ErrorCreatesDLQ(t *testing.T) {
 	taskRepo := dbmocks.NewMockTaskRepository(t)
 	dlqRepo := dbmocks.NewMockDLQRepository(t)
 
-	s := &Saga[struct{}]{
+	s := &Saga{
 		pool:           pool,
 		outTaskRepo:    taskRepo,
 		dlqOutTaskRepo: dlqRepo,
@@ -267,7 +267,7 @@ func TestDataBaseTaskReader_SendsTasks(t *testing.T) {
 	pool := &stubPool{tx: tx}
 	repo := dbmocks.NewMockTaskRepository(t)
 
-	s := &Saga[struct{}]{pool: pool}
+	s := &Saga{pool: pool}
 
 	repo.EXPECT().WithSession(tx).Return(repo).Maybe()
 	repo.EXPECT().GetByStatus(ctx, domain.TaskStatusWait).Return([]domain.SagaTask{{ID: 1}}, nil).Once()
@@ -295,7 +295,7 @@ func TestDataBaseDLQTaskReader_SendsTasks(t *testing.T) {
 	pool := &stubPool{tx: tx}
 	repo := dbmocks.NewMockDLQRepository(t)
 
-	s := &Saga[struct{}]{pool: pool}
+	s := &Saga{pool: pool}
 
 	repo.EXPECT().WithSession(tx).Return(repo).Maybe()
 	repo.EXPECT().

@@ -17,7 +17,7 @@ func TestSagaWrite_Success(t *testing.T) {
 	ctx := context.Background()
 	repo := dbmocks.NewMockTaskRepository(t)
 
-	s := &Saga[struct{}]{
+	s := &Saga{
 		outTaskRepo: repo,
 	}
 
@@ -54,7 +54,7 @@ func TestSagaWrite_CreateErrorTriggersRollback(t *testing.T) {
 	ctx := context.Background()
 	repo := dbmocks.NewMockTaskRepository(t)
 
-	s := &Saga[struct{}]{
+	s := &Saga{
 		outTaskRepo: repo,
 	}
 
@@ -90,7 +90,7 @@ func TestSagaAsyncWrite_Success(t *testing.T) {
 	ctx := context.Background()
 	repo := dbmocks.NewMockTaskRepository(t)
 
-	s := &Saga[struct{}]{
+	s := &Saga{
 		outTaskRepo: repo,
 	}
 
@@ -129,7 +129,7 @@ func TestSagaAsyncWrite_CreateErrorTriggersRollback(t *testing.T) {
 	ctx := context.Background()
 	repo := dbmocks.NewMockTaskRepository(t)
 
-	s := &Saga[struct{}]{
+	s := &Saga{
 		outTaskRepo: repo,
 	}
 

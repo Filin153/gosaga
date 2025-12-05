@@ -78,7 +78,7 @@ var _ txBeginner = (*loadPool)(nil)
 func TestSagaWrite_Load5000(t *testing.T) {
 	ctx := context.Background()
 	repo := &safeRepo{}
-	s := &Saga[int]{outTaskRepo: repo}
+	s := &Saga{outTaskRepo: repo}
 
 	const n = 5000
 	var wg sync.WaitGroup
@@ -113,7 +113,7 @@ func TestDataBaseTaskReader_Load5000(t *testing.T) {
 	repo := &safeRepo{tasks: tasks, oneShot: true}
 	tx := &stubTx{}
 	pool := &loadPool{tx: tx}
-	s := &Saga[int]{pool: pool}
+	s := &Saga{pool: pool}
 
 	ch := s.dataBaseTaskReader(ctx, repo)
 

@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (s *Saga[T]) dataBaseTaskReader(ctx context.Context, repo database.TaskRepository) <-chan *domain.SagaTask {
+func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskRepository) <-chan *domain.SagaTask {
 	taskMsg := make(chan *domain.SagaTask)
 	go func() {
 		defer close(taskMsg)
@@ -73,7 +73,7 @@ func (s *Saga[T]) dataBaseTaskReader(ctx context.Context, repo database.TaskRepo
 	return taskMsg
 }
 
-func (s *Saga[T]) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepository) <-chan *domain.SagaTask {
+func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepository) <-chan *domain.SagaTask {
 	taskMsg := make(chan *domain.SagaTask)
 	go func() {
 		defer close(taskMsg)

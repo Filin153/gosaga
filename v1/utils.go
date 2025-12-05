@@ -19,7 +19,7 @@ func Unmarshal(task *domain.SagaTask) (*domain.SagaMsg, error) {
 	return &msgData, nil
 }
 
-func (k *Saga[T]) generateIdempotencyKey() (string, error) {
+func (k *Saga) generateIdempotencyKey() (string, error) {
 	bytes := make([]byte, 32)
 	_, err := rand.Read(bytes)
 	if err != nil {
