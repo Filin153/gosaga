@@ -5,7 +5,7 @@ run:
   tests: false
 
 linters:
-  default: all
+  default: none
 
   enable:
     - govet # базовые проверки Go

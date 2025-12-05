@@ -42,8 +42,8 @@ func (_m *MockTaskRepository) EXPECT() *MockTaskRepository_Expecter {
 }
 
 // Create provides a mock function for the type MockTaskRepository
-func (_mock *MockTaskRepository) Create(task *domain.SagaTask) (int64, error) {
-	ret := _mock.Called(task)
+func (_mock *MockTaskRepository) Create(ctx context.Context, task *domain.SagaTask) (int64, error) {
+	ret := _mock.Called(ctx, task)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Create")
@@ -51,16 +51,16 @@ func (_mock *MockTaskRepository) Create(task *domain.SagaTask) (int64, error) {
 
 	var r0 int64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*domain.SagaTask) (int64, error)); ok {
-		return returnFunc(task)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *domain.SagaTask) (int64, error)); ok {
+		return returnFunc(ctx, task)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*domain.SagaTask) int64); ok {
-		r0 = returnFunc(task)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *domain.SagaTask) int64); ok {
+		r0 = returnFunc(ctx, task)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*domain.SagaTask) error); ok {
-		r1 = returnFunc(task)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *domain.SagaTask) error); ok {
+		r1 = returnFunc(ctx, task)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -73,19 +73,25 @@ type MockTaskRepository_Create_Call struct {
 }
 
 // Create is a helper method to define mock.On call
+//   - ctx context.Context
 //   - task *domain.SagaTask
-func (_e *MockTaskRepository_Expecter) Create(task interface{}) *MockTaskRepository_Create_Call {
-	return &MockTaskRepository_Create_Call{Call: _e.mock.On("Create", task)}
+func (_e *MockTaskRepository_Expecter) Create(ctx interface{}, task interface{}) *MockTaskRepository_Create_Call {
+	return &MockTaskRepository_Create_Call{Call: _e.mock.On("Create", ctx, task)}
 }
 
-func (_c *MockTaskRepository_Create_Call) Run(run func(task *domain.SagaTask)) *MockTaskRepository_Create_Call {
+func (_c *MockTaskRepository_Create_Call) Run(run func(ctx context.Context, task *domain.SagaTask)) *MockTaskRepository_Create_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *domain.SagaTask
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*domain.SagaTask)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *domain.SagaTask
+		if args[1] != nil {
+			arg1 = args[1].(*domain.SagaTask)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -96,22 +102,22 @@ func (_c *MockTaskRepository_Create_Call) Return(n int64, err error) *MockTaskRe
 	return _c
 }
 
-func (_c *MockTaskRepository_Create_Call) RunAndReturn(run func(task *domain.SagaTask) (int64, error)) *MockTaskRepository_Create_Call {
+func (_c *MockTaskRepository_Create_Call) RunAndReturn(run func(ctx context.Context, task *domain.SagaTask) (int64, error)) *MockTaskRepository_Create_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Delete provides a mock function for the type MockTaskRepository
-func (_mock *MockTaskRepository) Delete(id int64) error {
-	ret := _mock.Called(id)
+func (_mock *MockTaskRepository) Delete(ctx context.Context, id int64) error {
+	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Delete")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(int64) error); ok {
-		r0 = returnFunc(id)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = returnFunc(ctx, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -124,19 +130,25 @@ type MockTaskRepository_Delete_Call struct {
 }
 
 // Delete is a helper method to define mock.On call
+//   - ctx context.Context
 //   - id int64
-func (_e *MockTaskRepository_Expecter) Delete(id interface{}) *MockTaskRepository_Delete_Call {
-	return &MockTaskRepository_Delete_Call{Call: _e.mock.On("Delete", id)}
+func (_e *MockTaskRepository_Expecter) Delete(ctx interface{}, id interface{}) *MockTaskRepository_Delete_Call {
+	return &MockTaskRepository_Delete_Call{Call: _e.mock.On("Delete", ctx, id)}
 }
 
-func (_c *MockTaskRepository_Delete_Call) Run(run func(id int64)) *MockTaskRepository_Delete_Call {
+func (_c *MockTaskRepository_Delete_Call) Run(run func(ctx context.Context, id int64)) *MockTaskRepository_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int64
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(int64)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -147,14 +159,14 @@ func (_c *MockTaskRepository_Delete_Call) Return(err error) *MockTaskRepository_
 	return _c
 }
 
-func (_c *MockTaskRepository_Delete_Call) RunAndReturn(run func(id int64) error) *MockTaskRepository_Delete_Call {
+func (_c *MockTaskRepository_Delete_Call) RunAndReturn(run func(ctx context.Context, id int64) error) *MockTaskRepository_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetByID provides a mock function for the type MockTaskRepository
-func (_mock *MockTaskRepository) GetByID(id int64) (*domain.SagaTask, error) {
-	ret := _mock.Called(id)
+func (_mock *MockTaskRepository) GetByID(ctx context.Context, id int64) (*domain.SagaTask, error) {
+	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetByID")
@@ -162,18 +174,18 @@ func (_mock *MockTaskRepository) GetByID(id int64) (*domain.SagaTask, error) {
 
 	var r0 *domain.SagaTask
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(int64) (*domain.SagaTask, error)); ok {
-		return returnFunc(id)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) (*domain.SagaTask, error)); ok {
+		return returnFunc(ctx, id)
 	}
-	if returnFunc, ok := ret.Get(0).(func(int64) *domain.SagaTask); ok {
-		r0 = returnFunc(id)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) *domain.SagaTask); ok {
+		r0 = returnFunc(ctx, id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*domain.SagaTask)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(int64) error); ok {
-		r1 = returnFunc(id)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = returnFunc(ctx, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -186,19 +198,25 @@ type MockTaskRepository_GetByID_Call struct {
 }
 
 // GetByID is a helper method to define mock.On call
+//   - ctx context.Context
 //   - id int64
-func (_e *MockTaskRepository_Expecter) GetByID(id interface{}) *MockTaskRepository_GetByID_Call {
-	return &MockTaskRepository_GetByID_Call{Call: _e.mock.On("GetByID", id)}
+func (_e *MockTaskRepository_Expecter) GetByID(ctx interface{}, id interface{}) *MockTaskRepository_GetByID_Call {
+	return &MockTaskRepository_GetByID_Call{Call: _e.mock.On("GetByID", ctx, id)}
 }
 
-func (_c *MockTaskRepository_GetByID_Call) Run(run func(id int64)) *MockTaskRepository_GetByID_Call {
+func (_c *MockTaskRepository_GetByID_Call) Run(run func(ctx context.Context, id int64)) *MockTaskRepository_GetByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int64
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(int64)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -209,14 +227,14 @@ func (_c *MockTaskRepository_GetByID_Call) Return(sagaTask *domain.SagaTask, err
 	return _c
 }
 
-func (_c *MockTaskRepository_GetByID_Call) RunAndReturn(run func(id int64) (*domain.SagaTask, error)) *MockTaskRepository_GetByID_Call {
+func (_c *MockTaskRepository_GetByID_Call) RunAndReturn(run func(ctx context.Context, id int64) (*domain.SagaTask, error)) *MockTaskRepository_GetByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetByIdempotencyKey provides a mock function for the type MockTaskRepository
-func (_mock *MockTaskRepository) GetByIdempotencyKey(key string) (*domain.SagaTask, error) {
-	ret := _mock.Called(key)
+func (_mock *MockTaskRepository) GetByIdempotencyKey(ctx context.Context, key string) (*domain.SagaTask, error) {
+	ret := _mock.Called(ctx, key)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetByIdempotencyKey")
@@ -224,18 +242,18 @@ func (_mock *MockTaskRepository) GetByIdempotencyKey(key string) (*domain.SagaTa
 
 	var r0 *domain.SagaTask
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (*domain.SagaTask, error)); ok {
-		return returnFunc(key)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*domain.SagaTask, error)); ok {
+		return returnFunc(ctx, key)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string) *domain.SagaTask); ok {
-		r0 = returnFunc(key)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *domain.SagaTask); ok {
+		r0 = returnFunc(ctx, key)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*domain.SagaTask)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(key)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, key)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -248,19 +266,25 @@ type MockTaskRepository_GetByIdempotencyKey_Call struct {
 }
 
 // GetByIdempotencyKey is a helper method to define mock.On call
+//   - ctx context.Context
 //   - key string
-func (_e *MockTaskRepository_Expecter) GetByIdempotencyKey(key interface{}) *MockTaskRepository_GetByIdempotencyKey_Call {
-	return &MockTaskRepository_GetByIdempotencyKey_Call{Call: _e.mock.On("GetByIdempotencyKey", key)}
+func (_e *MockTaskRepository_Expecter) GetByIdempotencyKey(ctx interface{}, key interface{}) *MockTaskRepository_GetByIdempotencyKey_Call {
+	return &MockTaskRepository_GetByIdempotencyKey_Call{Call: _e.mock.On("GetByIdempotencyKey", ctx, key)}
 }
 
-func (_c *MockTaskRepository_GetByIdempotencyKey_Call) Run(run func(key string)) *MockTaskRepository_GetByIdempotencyKey_Call {
+func (_c *MockTaskRepository_GetByIdempotencyKey_Call) Run(run func(ctx context.Context, key string)) *MockTaskRepository_GetByIdempotencyKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -271,14 +295,14 @@ func (_c *MockTaskRepository_GetByIdempotencyKey_Call) Return(sagaTask *domain.S
 	return _c
 }
 
-func (_c *MockTaskRepository_GetByIdempotencyKey_Call) RunAndReturn(run func(key string) (*domain.SagaTask, error)) *MockTaskRepository_GetByIdempotencyKey_Call {
+func (_c *MockTaskRepository_GetByIdempotencyKey_Call) RunAndReturn(run func(ctx context.Context, key string) (*domain.SagaTask, error)) *MockTaskRepository_GetByIdempotencyKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetByStatus provides a mock function for the type MockTaskRepository
-func (_mock *MockTaskRepository) GetByStatus(status domain.TaskStatus) ([]domain.SagaTask, error) {
-	ret := _mock.Called(status)
+func (_mock *MockTaskRepository) GetByStatus(ctx context.Context, status domain.TaskStatus) ([]domain.SagaTask, error) {
+	ret := _mock.Called(ctx, status)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetByStatus")
@@ -286,18 +310,18 @@ func (_mock *MockTaskRepository) GetByStatus(status domain.TaskStatus) ([]domain
 
 	var r0 []domain.SagaTask
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(domain.TaskStatus) ([]domain.SagaTask, error)); ok {
-		return returnFunc(status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus) ([]domain.SagaTask, error)); ok {
+		return returnFunc(ctx, status)
 	}
-	if returnFunc, ok := ret.Get(0).(func(domain.TaskStatus) []domain.SagaTask); ok {
-		r0 = returnFunc(status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus) []domain.SagaTask); ok {
+		r0 = returnFunc(ctx, status)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]domain.SagaTask)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(domain.TaskStatus) error); ok {
-		r1 = returnFunc(status)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.TaskStatus) error); ok {
+		r1 = returnFunc(ctx, status)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -310,19 +334,25 @@ type MockTaskRepository_GetByStatus_Call struct {
 }
 
 // GetByStatus is a helper method to define mock.On call
+//   - ctx context.Context
 //   - status domain.TaskStatus
-func (_e *MockTaskRepository_Expecter) GetByStatus(status interface{}) *MockTaskRepository_GetByStatus_Call {
-	return &MockTaskRepository_GetByStatus_Call{Call: _e.mock.On("GetByStatus", status)}
+func (_e *MockTaskRepository_Expecter) GetByStatus(ctx interface{}, status interface{}) *MockTaskRepository_GetByStatus_Call {
+	return &MockTaskRepository_GetByStatus_Call{Call: _e.mock.On("GetByStatus", ctx, status)}
 }
 
-func (_c *MockTaskRepository_GetByStatus_Call) Run(run func(status domain.TaskStatus)) *MockTaskRepository_GetByStatus_Call {
+func (_c *MockTaskRepository_GetByStatus_Call) Run(run func(ctx context.Context, status domain.TaskStatus)) *MockTaskRepository_GetByStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 domain.TaskStatus
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(domain.TaskStatus)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 domain.TaskStatus
+		if args[1] != nil {
+			arg1 = args[1].(domain.TaskStatus)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -333,22 +363,22 @@ func (_c *MockTaskRepository_GetByStatus_Call) Return(sagaTasks []domain.SagaTas
 	return _c
 }
 
-func (_c *MockTaskRepository_GetByStatus_Call) RunAndReturn(run func(status domain.TaskStatus) ([]domain.SagaTask, error)) *MockTaskRepository_GetByStatus_Call {
+func (_c *MockTaskRepository_GetByStatus_Call) RunAndReturn(run func(ctx context.Context, status domain.TaskStatus) ([]domain.SagaTask, error)) *MockTaskRepository_GetByStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Update provides a mock function for the type MockTaskRepository
-func (_mock *MockTaskRepository) Update(task *domain.SagaTask) error {
-	ret := _mock.Called(task)
+func (_mock *MockTaskRepository) Update(ctx context.Context, task *domain.SagaTask) error {
+	ret := _mock.Called(ctx, task)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Update")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*domain.SagaTask) error); ok {
-		r0 = returnFunc(task)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *domain.SagaTask) error); ok {
+		r0 = returnFunc(ctx, task)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -361,19 +391,25 @@ type MockTaskRepository_Update_Call struct {
 }
 
 // Update is a helper method to define mock.On call
+//   - ctx context.Context
 //   - task *domain.SagaTask
-func (_e *MockTaskRepository_Expecter) Update(task interface{}) *MockTaskRepository_Update_Call {
-	return &MockTaskRepository_Update_Call{Call: _e.mock.On("Update", task)}
+func (_e *MockTaskRepository_Expecter) Update(ctx interface{}, task interface{}) *MockTaskRepository_Update_Call {
+	return &MockTaskRepository_Update_Call{Call: _e.mock.On("Update", ctx, task)}
 }
 
-func (_c *MockTaskRepository_Update_Call) Run(run func(task *domain.SagaTask)) *MockTaskRepository_Update_Call {
+func (_c *MockTaskRepository_Update_Call) Run(run func(ctx context.Context, task *domain.SagaTask)) *MockTaskRepository_Update_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *domain.SagaTask
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*domain.SagaTask)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *domain.SagaTask
+		if args[1] != nil {
+			arg1 = args[1].(*domain.SagaTask)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -384,22 +420,22 @@ func (_c *MockTaskRepository_Update_Call) Return(err error) *MockTaskRepository_
 	return _c
 }
 
-func (_c *MockTaskRepository_Update_Call) RunAndReturn(run func(task *domain.SagaTask) error) *MockTaskRepository_Update_Call {
+func (_c *MockTaskRepository_Update_Call) RunAndReturn(run func(ctx context.Context, task *domain.SagaTask) error) *MockTaskRepository_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UpdateByID provides a mock function for the type MockTaskRepository
-func (_mock *MockTaskRepository) UpdateByID(id int64, update domain.SagaTaskUpdate) error {
-	ret := _mock.Called(id, update)
+func (_mock *MockTaskRepository) UpdateByID(ctx context.Context, id int64, update domain.SagaTaskUpdate) error {
+	ret := _mock.Called(ctx, id, update)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateByID")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(int64, domain.SagaTaskUpdate) error); ok {
-		r0 = returnFunc(id, update)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, domain.SagaTaskUpdate) error); ok {
+		r0 = returnFunc(ctx, id, update)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -412,25 +448,31 @@ type MockTaskRepository_UpdateByID_Call struct {
 }
 
 // UpdateByID is a helper method to define mock.On call
+//   - ctx context.Context
 //   - id int64
 //   - update domain.SagaTaskUpdate
-func (_e *MockTaskRepository_Expecter) UpdateByID(id interface{}, update interface{}) *MockTaskRepository_UpdateByID_Call {
-	return &MockTaskRepository_UpdateByID_Call{Call: _e.mock.On("UpdateByID", id, update)}
+func (_e *MockTaskRepository_Expecter) UpdateByID(ctx interface{}, id interface{}, update interface{}) *MockTaskRepository_UpdateByID_Call {
+	return &MockTaskRepository_UpdateByID_Call{Call: _e.mock.On("UpdateByID", ctx, id, update)}
 }
 
-func (_c *MockTaskRepository_UpdateByID_Call) Run(run func(id int64, update domain.SagaTaskUpdate)) *MockTaskRepository_UpdateByID_Call {
+func (_c *MockTaskRepository_UpdateByID_Call) Run(run func(ctx context.Context, id int64, update domain.SagaTaskUpdate)) *MockTaskRepository_UpdateByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int64
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(int64)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.SagaTaskUpdate
+		var arg1 int64
 		if args[1] != nil {
-			arg1 = args[1].(domain.SagaTaskUpdate)
+			arg1 = args[1].(int64)
+		}
+		var arg2 domain.SagaTaskUpdate
+		if args[2] != nil {
+			arg2 = args[2].(domain.SagaTaskUpdate)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -441,7 +483,7 @@ func (_c *MockTaskRepository_UpdateByID_Call) Return(err error) *MockTaskReposit
 	return _c
 }
 
-func (_c *MockTaskRepository_UpdateByID_Call) RunAndReturn(run func(id int64, update domain.SagaTaskUpdate) error) *MockTaskRepository_UpdateByID_Call {
+func (_c *MockTaskRepository_UpdateByID_Call) RunAndReturn(run func(ctx context.Context, id int64, update domain.SagaTaskUpdate) error) *MockTaskRepository_UpdateByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -527,8 +569,8 @@ func (_m *MockDLQRepository) EXPECT() *MockDLQRepository_Expecter {
 }
 
 // Create provides a mock function for the type MockDLQRepository
-func (_mock *MockDLQRepository) Create(task *domain.DLQTask) (int64, error) {
-	ret := _mock.Called(task)
+func (_mock *MockDLQRepository) Create(ctx context.Context, task *domain.DLQTask) (int64, error) {
+	ret := _mock.Called(ctx, task)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Create")
@@ -536,16 +578,16 @@ func (_mock *MockDLQRepository) Create(task *domain.DLQTask) (int64, error) {
 
 	var r0 int64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*domain.DLQTask) (int64, error)); ok {
-		return returnFunc(task)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *domain.DLQTask) (int64, error)); ok {
+		return returnFunc(ctx, task)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*domain.DLQTask) int64); ok {
-		r0 = returnFunc(task)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *domain.DLQTask) int64); ok {
+		r0 = returnFunc(ctx, task)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*domain.DLQTask) error); ok {
-		r1 = returnFunc(task)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *domain.DLQTask) error); ok {
+		r1 = returnFunc(ctx, task)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -558,19 +600,25 @@ type MockDLQRepository_Create_Call struct {
 }
 
 // Create is a helper method to define mock.On call
+//   - ctx context.Context
 //   - task *domain.DLQTask
-func (_e *MockDLQRepository_Expecter) Create(task interface{}) *MockDLQRepository_Create_Call {
-	return &MockDLQRepository_Create_Call{Call: _e.mock.On("Create", task)}
+func (_e *MockDLQRepository_Expecter) Create(ctx interface{}, task interface{}) *MockDLQRepository_Create_Call {
+	return &MockDLQRepository_Create_Call{Call: _e.mock.On("Create", ctx, task)}
 }
 
-func (_c *MockDLQRepository_Create_Call) Run(run func(task *domain.DLQTask)) *MockDLQRepository_Create_Call {
+func (_c *MockDLQRepository_Create_Call) Run(run func(ctx context.Context, task *domain.DLQTask)) *MockDLQRepository_Create_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *domain.DLQTask
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*domain.DLQTask)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *domain.DLQTask
+		if args[1] != nil {
+			arg1 = args[1].(*domain.DLQTask)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -581,22 +629,22 @@ func (_c *MockDLQRepository_Create_Call) Return(n int64, err error) *MockDLQRepo
 	return _c
 }
 
-func (_c *MockDLQRepository_Create_Call) RunAndReturn(run func(task *domain.DLQTask) (int64, error)) *MockDLQRepository_Create_Call {
+func (_c *MockDLQRepository_Create_Call) RunAndReturn(run func(ctx context.Context, task *domain.DLQTask) (int64, error)) *MockDLQRepository_Create_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Delete provides a mock function for the type MockDLQRepository
-func (_mock *MockDLQRepository) Delete(id int64) error {
-	ret := _mock.Called(id)
+func (_mock *MockDLQRepository) Delete(ctx context.Context, id int64) error {
+	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Delete")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(int64) error); ok {
-		r0 = returnFunc(id)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = returnFunc(ctx, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -609,19 +657,25 @@ type MockDLQRepository_Delete_Call struct {
 }
 
 // Delete is a helper method to define mock.On call
+//   - ctx context.Context
 //   - id int64
-func (_e *MockDLQRepository_Expecter) Delete(id interface{}) *MockDLQRepository_Delete_Call {
-	return &MockDLQRepository_Delete_Call{Call: _e.mock.On("Delete", id)}
+func (_e *MockDLQRepository_Expecter) Delete(ctx interface{}, id interface{}) *MockDLQRepository_Delete_Call {
+	return &MockDLQRepository_Delete_Call{Call: _e.mock.On("Delete", ctx, id)}
 }
 
-func (_c *MockDLQRepository_Delete_Call) Run(run func(id int64)) *MockDLQRepository_Delete_Call {
+func (_c *MockDLQRepository_Delete_Call) Run(run func(ctx context.Context, id int64)) *MockDLQRepository_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int64
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(int64)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -632,14 +686,14 @@ func (_c *MockDLQRepository_Delete_Call) Return(err error) *MockDLQRepository_De
 	return _c
 }
 
-func (_c *MockDLQRepository_Delete_Call) RunAndReturn(run func(id int64) error) *MockDLQRepository_Delete_Call {
+func (_c *MockDLQRepository_Delete_Call) RunAndReturn(run func(ctx context.Context, id int64) error) *MockDLQRepository_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetByID provides a mock function for the type MockDLQRepository
-func (_mock *MockDLQRepository) GetByID(id int64) (*domain.DLQTask, error) {
-	ret := _mock.Called(id)
+func (_mock *MockDLQRepository) GetByID(ctx context.Context, id int64) (*domain.DLQTask, error) {
+	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetByID")
@@ -647,18 +701,18 @@ func (_mock *MockDLQRepository) GetByID(id int64) (*domain.DLQTask, error) {
 
 	var r0 *domain.DLQTask
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(int64) (*domain.DLQTask, error)); ok {
-		return returnFunc(id)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) (*domain.DLQTask, error)); ok {
+		return returnFunc(ctx, id)
 	}
-	if returnFunc, ok := ret.Get(0).(func(int64) *domain.DLQTask); ok {
-		r0 = returnFunc(id)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) *domain.DLQTask); ok {
+		r0 = returnFunc(ctx, id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*domain.DLQTask)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(int64) error); ok {
-		r1 = returnFunc(id)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = returnFunc(ctx, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -671,19 +725,25 @@ type MockDLQRepository_GetByID_Call struct {
 }
 
 // GetByID is a helper method to define mock.On call
+//   - ctx context.Context
 //   - id int64
-func (_e *MockDLQRepository_Expecter) GetByID(id interface{}) *MockDLQRepository_GetByID_Call {
-	return &MockDLQRepository_GetByID_Call{Call: _e.mock.On("GetByID", id)}
+func (_e *MockDLQRepository_Expecter) GetByID(ctx interface{}, id interface{}) *MockDLQRepository_GetByID_Call {
+	return &MockDLQRepository_GetByID_Call{Call: _e.mock.On("GetByID", ctx, id)}
 }
 
-func (_c *MockDLQRepository_GetByID_Call) Run(run func(id int64)) *MockDLQRepository_GetByID_Call {
+func (_c *MockDLQRepository_GetByID_Call) Run(run func(ctx context.Context, id int64)) *MockDLQRepository_GetByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int64
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(int64)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -694,14 +754,14 @@ func (_c *MockDLQRepository_GetByID_Call) Return(dLQTask *domain.DLQTask, err er
 	return _c
 }
 
-func (_c *MockDLQRepository_GetByID_Call) RunAndReturn(run func(id int64) (*domain.DLQTask, error)) *MockDLQRepository_GetByID_Call {
+func (_c *MockDLQRepository_GetByID_Call) RunAndReturn(run func(ctx context.Context, id int64) (*domain.DLQTask, error)) *MockDLQRepository_GetByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetByStatus provides a mock function for the type MockDLQRepository
-func (_mock *MockDLQRepository) GetByStatus(status domain.TaskStatus) ([]domain.DLQEntry, error) {
-	ret := _mock.Called(status)
+func (_mock *MockDLQRepository) GetByStatus(ctx context.Context, status domain.TaskStatus) ([]domain.DLQEntry, error) {
+	ret := _mock.Called(ctx, status)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetByStatus")
@@ -709,18 +769,18 @@ func (_mock *MockDLQRepository) GetByStatus(status domain.TaskStatus) ([]domain.
 
 	var r0 []domain.DLQEntry
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(domain.TaskStatus) ([]domain.DLQEntry, error)); ok {
-		return returnFunc(status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus) ([]domain.DLQEntry, error)); ok {
+		return returnFunc(ctx, status)
 	}
-	if returnFunc, ok := ret.Get(0).(func(domain.TaskStatus) []domain.DLQEntry); ok {
-		r0 = returnFunc(status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus) []domain.DLQEntry); ok {
+		r0 = returnFunc(ctx, status)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]domain.DLQEntry)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(domain.TaskStatus) error); ok {
-		r1 = returnFunc(status)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.TaskStatus) error); ok {
+		r1 = returnFunc(ctx, status)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -733,19 +793,25 @@ type MockDLQRepository_GetByStatus_Call struct {
 }
 
 // GetByStatus is a helper method to define mock.On call
+//   - ctx context.Context
 //   - status domain.TaskStatus
-func (_e *MockDLQRepository_Expecter) GetByStatus(status interface{}) *MockDLQRepository_GetByStatus_Call {
-	return &MockDLQRepository_GetByStatus_Call{Call: _e.mock.On("GetByStatus", status)}
+func (_e *MockDLQRepository_Expecter) GetByStatus(ctx interface{}, status interface{}) *MockDLQRepository_GetByStatus_Call {
+	return &MockDLQRepository_GetByStatus_Call{Call: _e.mock.On("GetByStatus", ctx, status)}
 }
 
-func (_c *MockDLQRepository_GetByStatus_Call) Run(run func(status domain.TaskStatus)) *MockDLQRepository_GetByStatus_Call {
+func (_c *MockDLQRepository_GetByStatus_Call) Run(run func(ctx context.Context, status domain.TaskStatus)) *MockDLQRepository_GetByStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 domain.TaskStatus
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(domain.TaskStatus)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 domain.TaskStatus
+		if args[1] != nil {
+			arg1 = args[1].(domain.TaskStatus)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -756,14 +822,14 @@ func (_c *MockDLQRepository_GetByStatus_Call) Return(dLQEntrys []domain.DLQEntry
 	return _c
 }
 
-func (_c *MockDLQRepository_GetByStatus_Call) RunAndReturn(run func(status domain.TaskStatus) ([]domain.DLQEntry, error)) *MockDLQRepository_GetByStatus_Call {
+func (_c *MockDLQRepository_GetByStatus_Call) RunAndReturn(run func(ctx context.Context, status domain.TaskStatus) ([]domain.DLQEntry, error)) *MockDLQRepository_GetByStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetByTaskID provides a mock function for the type MockDLQRepository
-func (_mock *MockDLQRepository) GetByTaskID(taskID int64) (*domain.DLQTask, error) {
-	ret := _mock.Called(taskID)
+func (_mock *MockDLQRepository) GetByTaskID(ctx context.Context, taskID int64) (*domain.DLQTask, error) {
+	ret := _mock.Called(ctx, taskID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetByTaskID")
@@ -771,18 +837,18 @@ func (_mock *MockDLQRepository) GetByTaskID(taskID int64) (*domain.DLQTask, erro
 
 	var r0 *domain.DLQTask
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(int64) (*domain.DLQTask, error)); ok {
-		return returnFunc(taskID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) (*domain.DLQTask, error)); ok {
+		return returnFunc(ctx, taskID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(int64) *domain.DLQTask); ok {
-		r0 = returnFunc(taskID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) *domain.DLQTask); ok {
+		r0 = returnFunc(ctx, taskID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*domain.DLQTask)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(int64) error); ok {
-		r1 = returnFunc(taskID)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = returnFunc(ctx, taskID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -795,19 +861,25 @@ type MockDLQRepository_GetByTaskID_Call struct {
 }
 
 // GetByTaskID is a helper method to define mock.On call
+//   - ctx context.Context
 //   - taskID int64
-func (_e *MockDLQRepository_Expecter) GetByTaskID(taskID interface{}) *MockDLQRepository_GetByTaskID_Call {
-	return &MockDLQRepository_GetByTaskID_Call{Call: _e.mock.On("GetByTaskID", taskID)}
+func (_e *MockDLQRepository_Expecter) GetByTaskID(ctx interface{}, taskID interface{}) *MockDLQRepository_GetByTaskID_Call {
+	return &MockDLQRepository_GetByTaskID_Call{Call: _e.mock.On("GetByTaskID", ctx, taskID)}
 }
 
-func (_c *MockDLQRepository_GetByTaskID_Call) Run(run func(taskID int64)) *MockDLQRepository_GetByTaskID_Call {
+func (_c *MockDLQRepository_GetByTaskID_Call) Run(run func(ctx context.Context, taskID int64)) *MockDLQRepository_GetByTaskID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int64
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(int64)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -818,14 +890,14 @@ func (_c *MockDLQRepository_GetByTaskID_Call) Return(dLQTask *domain.DLQTask, er
 	return _c
 }
 
-func (_c *MockDLQRepository_GetByTaskID_Call) RunAndReturn(run func(taskID int64) (*domain.DLQTask, error)) *MockDLQRepository_GetByTaskID_Call {
+func (_c *MockDLQRepository_GetByTaskID_Call) RunAndReturn(run func(ctx context.Context, taskID int64) (*domain.DLQTask, error)) *MockDLQRepository_GetByTaskID_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetErrorsWithAttempts provides a mock function for the type MockDLQRepository
-func (_mock *MockDLQRepository) GetErrorsWithAttempts() ([]domain.DLQEntry, error) {
-	ret := _mock.Called()
+func (_mock *MockDLQRepository) GetErrorsWithAttempts(ctx context.Context) ([]domain.DLQEntry, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetErrorsWithAttempts")
@@ -833,18 +905,18 @@ func (_mock *MockDLQRepository) GetErrorsWithAttempts() ([]domain.DLQEntry, erro
 
 	var r0 []domain.DLQEntry
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() ([]domain.DLQEntry, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]domain.DLQEntry, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() []domain.DLQEntry); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []domain.DLQEntry); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]domain.DLQEntry)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -857,13 +929,20 @@ type MockDLQRepository_GetErrorsWithAttempts_Call struct {
 }
 
 // GetErrorsWithAttempts is a helper method to define mock.On call
-func (_e *MockDLQRepository_Expecter) GetErrorsWithAttempts() *MockDLQRepository_GetErrorsWithAttempts_Call {
-	return &MockDLQRepository_GetErrorsWithAttempts_Call{Call: _e.mock.On("GetErrorsWithAttempts")}
+//   - ctx context.Context
+func (_e *MockDLQRepository_Expecter) GetErrorsWithAttempts(ctx interface{}) *MockDLQRepository_GetErrorsWithAttempts_Call {
+	return &MockDLQRepository_GetErrorsWithAttempts_Call{Call: _e.mock.On("GetErrorsWithAttempts", ctx)}
 }
 
-func (_c *MockDLQRepository_GetErrorsWithAttempts_Call) Run(run func()) *MockDLQRepository_GetErrorsWithAttempts_Call {
+func (_c *MockDLQRepository_GetErrorsWithAttempts_Call) Run(run func(ctx context.Context)) *MockDLQRepository_GetErrorsWithAttempts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -873,22 +952,22 @@ func (_c *MockDLQRepository_GetErrorsWithAttempts_Call) Return(dLQEntrys []domai
 	return _c
 }
 
-func (_c *MockDLQRepository_GetErrorsWithAttempts_Call) RunAndReturn(run func() ([]domain.DLQEntry, error)) *MockDLQRepository_GetErrorsWithAttempts_Call {
+func (_c *MockDLQRepository_GetErrorsWithAttempts_Call) RunAndReturn(run func(ctx context.Context) ([]domain.DLQEntry, error)) *MockDLQRepository_GetErrorsWithAttempts_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Update provides a mock function for the type MockDLQRepository
-func (_mock *MockDLQRepository) Update(task *domain.DLQTask) error {
-	ret := _mock.Called(task)
+func (_mock *MockDLQRepository) Update(ctx context.Context, task *domain.DLQTask) error {
+	ret := _mock.Called(ctx, task)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Update")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*domain.DLQTask) error); ok {
-		r0 = returnFunc(task)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *domain.DLQTask) error); ok {
+		r0 = returnFunc(ctx, task)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -901,19 +980,25 @@ type MockDLQRepository_Update_Call struct {
 }
 
 // Update is a helper method to define mock.On call
+//   - ctx context.Context
 //   - task *domain.DLQTask
-func (_e *MockDLQRepository_Expecter) Update(task interface{}) *MockDLQRepository_Update_Call {
-	return &MockDLQRepository_Update_Call{Call: _e.mock.On("Update", task)}
+func (_e *MockDLQRepository_Expecter) Update(ctx interface{}, task interface{}) *MockDLQRepository_Update_Call {
+	return &MockDLQRepository_Update_Call{Call: _e.mock.On("Update", ctx, task)}
 }
 
-func (_c *MockDLQRepository_Update_Call) Run(run func(task *domain.DLQTask)) *MockDLQRepository_Update_Call {
+func (_c *MockDLQRepository_Update_Call) Run(run func(ctx context.Context, task *domain.DLQTask)) *MockDLQRepository_Update_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *domain.DLQTask
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*domain.DLQTask)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *domain.DLQTask
+		if args[1] != nil {
+			arg1 = args[1].(*domain.DLQTask)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -924,22 +1009,22 @@ func (_c *MockDLQRepository_Update_Call) Return(err error) *MockDLQRepository_Up
 	return _c
 }
 
-func (_c *MockDLQRepository_Update_Call) RunAndReturn(run func(task *domain.DLQTask) error) *MockDLQRepository_Update_Call {
+func (_c *MockDLQRepository_Update_Call) RunAndReturn(run func(ctx context.Context, task *domain.DLQTask) error) *MockDLQRepository_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UpdateByID provides a mock function for the type MockDLQRepository
-func (_mock *MockDLQRepository) UpdateByID(id int64, update domain.DLQTaskUpdate) error {
-	ret := _mock.Called(id, update)
+func (_mock *MockDLQRepository) UpdateByID(ctx context.Context, id int64, update domain.DLQTaskUpdate) error {
+	ret := _mock.Called(ctx, id, update)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateByID")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(int64, domain.DLQTaskUpdate) error); ok {
-		r0 = returnFunc(id, update)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, domain.DLQTaskUpdate) error); ok {
+		r0 = returnFunc(ctx, id, update)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -952,25 +1037,31 @@ type MockDLQRepository_UpdateByID_Call struct {
 }
 
 // UpdateByID is a helper method to define mock.On call
+//   - ctx context.Context
 //   - id int64
 //   - update domain.DLQTaskUpdate
-func (_e *MockDLQRepository_Expecter) UpdateByID(id interface{}, update interface{}) *MockDLQRepository_UpdateByID_Call {
-	return &MockDLQRepository_UpdateByID_Call{Call: _e.mock.On("UpdateByID", id, update)}
+func (_e *MockDLQRepository_Expecter) UpdateByID(ctx interface{}, id interface{}, update interface{}) *MockDLQRepository_UpdateByID_Call {
+	return &MockDLQRepository_UpdateByID_Call{Call: _e.mock.On("UpdateByID", ctx, id, update)}
 }
 
-func (_c *MockDLQRepository_UpdateByID_Call) Run(run func(id int64, update domain.DLQTaskUpdate)) *MockDLQRepository_UpdateByID_Call {
+func (_c *MockDLQRepository_UpdateByID_Call) Run(run func(ctx context.Context, id int64, update domain.DLQTaskUpdate)) *MockDLQRepository_UpdateByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int64
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(int64)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 domain.DLQTaskUpdate
+		var arg1 int64
 		if args[1] != nil {
-			arg1 = args[1].(domain.DLQTaskUpdate)
+			arg1 = args[1].(int64)
+		}
+		var arg2 domain.DLQTaskUpdate
+		if args[2] != nil {
+			arg2 = args[2].(domain.DLQTaskUpdate)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -981,7 +1072,7 @@ func (_c *MockDLQRepository_UpdateByID_Call) Return(err error) *MockDLQRepositor
 	return _c
 }
 
-func (_c *MockDLQRepository_UpdateByID_Call) RunAndReturn(run func(id int64, update domain.DLQTaskUpdate) error) *MockDLQRepository_UpdateByID_Call {
+func (_c *MockDLQRepository_UpdateByID_Call) RunAndReturn(run func(ctx context.Context, id int64, update domain.DLQTaskUpdate) error) *MockDLQRepository_UpdateByID_Call {
 	_c.Call.Return(run)
 	return _c
 }

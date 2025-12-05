@@ -12,12 +12,16 @@ import (
 	"github.com/Filin153/gosaga/storage/database/pg"
 
 	"github.com/IBM/sarama"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type txBeginner interface {
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
+}
+
 type Saga[T any] struct {
-	ctx            context.Context
-	pool           *pgxpool.Pool
+	pool           txBeginner
 	inTaskRepo     database.TaskRepository
 	outTaskRepo    database.TaskRepository
 	dlqInTaskRepo  database.DLQRepository
@@ -28,23 +32,22 @@ type Saga[T any] struct {
 
 func NewSaga[T any](ctx context.Context, pool *pgxpool.Pool, readerGroup string, readerTopics, hosts []string, conf *sarama.Config) (*Saga[T], error) {
 	slog.Info("Saga.NewSaga: start")
-	kafkaWriter, err := kafka.NewKafkaWriter(ctx, hosts, conf)
+	kafkaWriter, err := kafka.NewKafkaWriter(hosts, conf)
 	if err != nil {
 		slog.Error("Saga.NewSaga: NewKafkaWriter error", "error", err.Error())
 		return nil, err
 	}
 
-	kafkaReader, err := kafka.NewKafkaRider(ctx, readerGroup, readerTopics, hosts, conf, 10)
+	kafkaReader, err := kafka.NewKafkaRider(readerGroup, readerTopics, hosts, conf, 10)
 	if err != nil {
 		slog.Error("Saga.NewSaga: NewKafkaRider error", "error", err.Error())
 		return nil, err
 	}
 
-	kafkaReader.Run()
+	kafkaReader.Run(ctx)
 
 	slog.Info("Saga.NewSaga: success")
 	return &Saga[T]{
-		ctx:            ctx,
 		pool:           pool,
 		inTaskRepo:     pg.NewInTaskRepository(ctx, pool),
 		outTaskRepo:    pg.NewOutTaskRepository(ctx, pool),
@@ -57,20 +60,20 @@ func NewSaga[T any](ctx context.Context, pool *pgxpool.Pool, readerGroup string,
 
 // Добавить алгоритм распределдения ресурсов чтобы небыло голодания
 // limiter для каждого из потоков, limiter * 4 = Все потоки
-func (s *Saga[T]) RunWorkers(limiter int, outWorker gosagaWorkerInterface, inWorker gosagaWorkerInterface) error {
+func (s *Saga[T]) RunWorkers(ctx context.Context, limiter int, outWorker WorkerInterface, inWorker WorkerInterface) error {
 	slog.Info("Saga.RunWorkers: start", "limiter", limiter)
 	OutTaskWorkerCountLimiter := make(chan struct{}, limiter)
 	dlqOutTaskWorkerCountLimiter := make(chan struct{}, limiter)
 	InTaskWorkerCountLimiter := make(chan struct{}, limiter)
 	dlqInTaskWorkerCountLimiter := make(chan struct{}, limiter)
 
-	newOutWorker, err := outWorker.New(s.ctx)
+	newOutWorker, err := outWorker.New(ctx)
 	if err != nil {
 		slog.Error("Saga.RunWorkers: outWorker.New error", "error", err.Error())
 		return err
 	}
 
-	newInWorker, err := inWorker.New(s.ctx)
+	newInWorker, err := inWorker.New(ctx)
 	if err != nil {
 		slog.Error("Saga.RunWorkers: inWorker.New error", "error", err.Error())
 		return err
@@ -105,7 +108,7 @@ func (s *Saga[T]) RunWorkers(limiter int, outWorker gosagaWorkerInterface, inWor
 				continue
 			}
 
-			task, err := s.inTaskRepo.GetByIdempotencyKey(msgIdempotencyKey)
+			task, err := s.inTaskRepo.GetByIdempotencyKey(ctx, msgIdempotencyKey)
 			if task != nil {
 				slog.Info("Saga.RunWorkers: skip duplicated message by idempotency_key", "idempotency_key", msgIdempotencyKey)
 				continue
@@ -120,7 +123,7 @@ func (s *Saga[T]) RunWorkers(limiter int, outWorker gosagaWorkerInterface, inWor
 				Data:           msg.Value,
 				RollbackData:   &rollbackData,
 			}
-			_, err = s.inTaskRepo.Create(&sagaTaskData)
+			_, err = s.inTaskRepo.Create(ctx, &sagaTaskData)
 			if err != nil {
 				slog.Error("Saga.RunWorkers: inTaskRepo.Create", "error", err.Error(), "idempotency_key", msgIdempotencyKey)
 				continue
@@ -134,7 +137,7 @@ func (s *Saga[T]) RunWorkers(limiter int, outWorker gosagaWorkerInterface, inWor
 		for {
 			time.Sleep(10 * time.Second)
 
-			errTasks, err := s.dlqInTaskRepo.GetErrorsWithAttempts()
+			errTasks, err := s.dlqInTaskRepo.GetErrorsWithAttempts(ctx)
 			if err != nil {
 				slog.Error("Saga.RunWorkers: dlqInTaskRepo.GetErrorsWithAttempts", "error", err.Error())
 				continue
@@ -144,7 +147,7 @@ func (s *Saga[T]) RunWorkers(limiter int, outWorker gosagaWorkerInterface, inWor
 				var rollBackMsg domain.SagaMsg
 				if task.Task.RollbackData == nil {
 					status := domain.TaskStatusErrorRollbackNone
-					err = s.inTaskRepo.UpdateByID(task.Task.ID, domain.SagaTaskUpdate{
+					err = s.inTaskRepo.UpdateByID(ctx, task.Task.ID, domain.SagaTaskUpdate{
 						Status: &status,
 					})
 					if err != nil {
@@ -160,14 +163,14 @@ func (s *Saga[T]) RunWorkers(limiter int, outWorker gosagaWorkerInterface, inWor
 					continue
 				}
 
-				err = s.Write(&rollBackMsg, nil, func() {})
+				err = s.Write(ctx, &rollBackMsg, nil, func() {})
 				if err != nil {
 					slog.Error("Saga.RunWorkers: Write rollback message", "error", err.Error())
 					continue
 				}
 
 				status := domain.TaskStatusRollback
-				err = s.inTaskRepo.UpdateByID(task.Task.ID, domain.SagaTaskUpdate{
+				err = s.inTaskRepo.UpdateByID(ctx, task.Task.ID, domain.SagaTaskUpdate{
 					Status: &status,
 				})
 				if err != nil {
@@ -181,75 +184,75 @@ func (s *Saga[T]) RunWorkers(limiter int, outWorker gosagaWorkerInterface, inWor
 	// InTask
 	go func() {
 		slog.Info("Saga.RunWorkers: start InTask loop")
-		inTasksMsgChan := s.dataBaseTaskReader(s.inTaskRepo)
+		inTasksMsgChan := s.dataBaseTaskReader(ctx, s.inTaskRepo)
 		for task := range inTasksMsgChan {
 			select {
-			case <-s.ctx.Done():
+			case <-ctx.Done():
 				return
 			case InTaskWorkerCountLimiter <- struct{}{}:
 			}
-			go func() {
+			go func(task *domain.SagaTask) {
 				defer func() { <-InTaskWorkerCountLimiter }()
-				s.inWork(task, newInWorker.Worker)
-			}()
+				_ = s.inWork(ctx, task, newInWorker.Worker)
+			}(task)
 		}
 	}()
 
 	// DlqInTask
 	go func() {
 		slog.Info("Saga.RunWorkers: start DlqInTask loop")
-		dlqInTasksMsgChan := s.dataBaseDLQTaskReader(s.dlqInTaskRepo)
+		dlqInTasksMsgChan := s.dataBaseDLQTaskReader(ctx, s.dlqInTaskRepo)
 		for task := range dlqInTasksMsgChan {
 			select {
-			case <-s.ctx.Done():
+			case <-ctx.Done():
 				return
 			case dlqInTaskWorkerCountLimiter <- struct{}{}:
 			}
-			go func() {
+			go func(task *domain.SagaTask) {
 				defer func() { <-dlqInTaskWorkerCountLimiter }()
-				s.inWork(task, newInWorker.DlqWorker)
-			}()
+				_ = s.inWork(ctx, task, newInWorker.DlqWorker)
+			}(task)
 		}
 	}()
 
 	// OutTask
 	go func() {
 		slog.Info("Saga.RunWorkers: start OutTask loop")
-		outTasksMsgChan := s.dataBaseTaskReader(s.outTaskRepo)
+		outTasksMsgChan := s.dataBaseTaskReader(ctx, s.outTaskRepo)
 		for task := range outTasksMsgChan {
 			select {
-			case <-s.ctx.Done():
+			case <-ctx.Done():
 				return
 			case OutTaskWorkerCountLimiter <- struct{}{}:
 			}
-			go func() {
+			go func(task *domain.SagaTask) {
 				defer func() { <-OutTaskWorkerCountLimiter }()
-				s.outWork(task, newOutWorker.Worker)
-			}()
+				_ = s.outWork(ctx, task, newOutWorker.Worker)
+			}(task)
 		}
 	}()
 
 	// DlqOutTask
 	go func() {
 		slog.Info("Saga.RunWorkers: start DlqOutTask loop")
-		dlqOutTasksMsgChan := s.dataBaseDLQTaskReader(s.dlqOutTaskRepo)
+		dlqOutTasksMsgChan := s.dataBaseDLQTaskReader(ctx, s.dlqOutTaskRepo)
 		for task := range dlqOutTasksMsgChan {
 			select {
-			case <-s.ctx.Done():
+			case <-ctx.Done():
 				return
 			case dlqOutTaskWorkerCountLimiter <- struct{}{}:
 			}
-			go func() {
+			go func(task *domain.SagaTask) {
 				defer func() { <-dlqOutTaskWorkerCountLimiter }()
-				s.outWork(task, newOutWorker.Worker)
-			}()
+				_ = s.outWork(ctx, task, newOutWorker.Worker)
+			}(task)
 		}
 	}()
 
 	return nil
 }
 
-func (s *Saga[T]) Write(msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollbackFunc func()) (err error) {
+func (s *Saga[T]) Write(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollbackFunc func()) (err error) {
 	defer func() {
 		if err != nil {
 			slog.Error("Saga.Write: error, calling rollback", "error", err.Error())
@@ -285,7 +288,7 @@ func (s *Saga[T]) Write(msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollba
 		Data:           jsonMarshal,
 		RollbackData:   rollbackPayload,
 	}
-	_, err = s.outTaskRepo.Create(&task)
+	_, err = s.outTaskRepo.Create(ctx, &task)
 	if err != nil {
 		slog.Error("Saga.Write: outTaskRepo.Create error", "error", err.Error())
 		return err
@@ -295,7 +298,7 @@ func (s *Saga[T]) Write(msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollba
 	return nil
 }
 
-func (s *Saga[T]) AsyncWrite(msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollbackFunc func()) (err error) {
+func (s *Saga[T]) AsyncWrite(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, rollbackFunc func()) (err error) {
 	defer func() {
 		if err != nil {
 			slog.Error("Saga.AsyncWrite: early error, calling rollback", "error", err.Error())
@@ -340,7 +343,7 @@ func (s *Saga[T]) AsyncWrite(msg *domain.SagaMsg, rollbackMsg *domain.SagaMsg, r
 			Data:           jsonMarshal,
 			RollbackData:   rollbackPayload,
 		}
-		_, err = s.outTaskRepo.Create(&task)
+		_, err = s.outTaskRepo.Create(ctx, &task)
 		if err != nil {
 			slog.Error("AsyncWrite go func()", "error", err.Error())
 		}

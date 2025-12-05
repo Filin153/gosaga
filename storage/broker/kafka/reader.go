@@ -9,14 +9,13 @@ import (
 )
 
 type KafkaRider struct {
-	ctx           context.Context
 	topics        []string
 	group         string
 	consumerGroup sarama.ConsumerGroup
 	outChan       chan *sarama.ConsumerMessage
 }
 
-func NewKafkaRider(ctx context.Context, group string, topics []string, hosts []string, conf *sarama.Config, buffer int) (*KafkaRider, error) {
+func NewKafkaRider(group string, topics []string, hosts []string, conf *sarama.Config, buffer int) (*KafkaRider, error) {
 	conf.Consumer.Return.Errors = true
 	conf.Consumer.Offsets.AutoCommit.Enable = true
 
@@ -26,7 +25,6 @@ func NewKafkaRider(ctx context.Context, group string, topics []string, hosts []s
 	}
 
 	return &KafkaRider{
-		ctx:           ctx,
 		topics:        topics,
 		group:         group,
 		consumerGroup: consumerGroup,
@@ -34,16 +32,16 @@ func NewKafkaRider(ctx context.Context, group string, topics []string, hosts []s
 	}, nil
 }
 
-func (k *KafkaRider) Run() {
+func (k *KafkaRider) Run(ctx context.Context) {
 	go func() {
 		backoff := time.Second
 		for {
 			select {
-			case <-k.ctx.Done():
+			case <-ctx.Done():
 				slog.Info("KafkaRider.Run: context canceled, stop consuming")
 				return
 			default:
-				if err := k.consumerGroup.Consume(k.ctx, k.topics, k); err != nil {
+				if err := k.consumerGroup.Consume(ctx, k.topics, k); err != nil {
 					slog.Error("KafkaRider.Run: Consume error", "error", err.Error())
 					time.Sleep(backoff)
 					if backoff < 30*time.Second {
@@ -72,6 +70,7 @@ func (k *KafkaRider) Cleanup(_ sarama.ConsumerGroupSession) error {
 func (k *KafkaRider) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	msgChan := claim.Messages()
 	errChan := k.consumerGroup.Errors()
+	ctx := sess.Context()
 	for {
 		select {
 		case msg := <-msgChan:
@@ -85,7 +84,7 @@ func (k *KafkaRider) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama
 			if err != nil {
 				slog.Error("KafkaRider.ConsumeClaim", "error", err.Error())
 			}
-		case <-k.ctx.Done():
+		case <-ctx.Done():
 			slog.Info("KafkaRider.ConsumeClaim: context canceled")
 			return nil
 		}

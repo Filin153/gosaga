@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/Filin153/gosaga/domain"
 	"github.com/Filin153/gosaga/storage/database"
@@ -12,30 +13,45 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type InTaskRepository struct {
-	ctx context.Context
-	db  session
+// taskPgRepository реализует database.TaskRepository и работает с заданной таблицей.
+// Таблица передаётся при создании репозитория, чтобы использовать одну структуру
+// для in/out задач.
+type taskPgRepository struct {
+	db    session
+	table string
 }
 
-func NewInTaskRepository(ctx context.Context, pool *pgxpool.Pool) *InTaskRepository {
-	return &InTaskRepository{ctx: ctx, db: pool}
+// NewTaskRepository позволяет создать репозиторий для произвольной таблицы задач.
+func newTaskRepository(ctx context.Context, pool *pgxpool.Pool, table string) database.TaskRepository {
+	return &taskPgRepository{db: pool, table: table}
 }
 
-func (r *InTaskRepository) WithSession(sess session) database.TaskRepository {
-	return &InTaskRepository{
-		ctx: r.ctx,
-		db:  sess,
+// NewInTaskRepository создаёт репозиторий для таблицы go_saga_in_task.
+func NewInTaskRepository(ctx context.Context, pool *pgxpool.Pool) database.TaskRepository {
+	return newTaskRepository(ctx, pool, "go_saga_in_task")
+}
+
+// NewOutTaskRepository возвращает репозиторий задач для таблицы go_saga_out_task.
+// Использует общую структуру taskPgRepository, где таблица задаётся при создании.
+func NewOutTaskRepository(ctx context.Context, pool *pgxpool.Pool) database.TaskRepository {
+	return newTaskRepository(ctx, pool, "go_saga_out_task")
+}
+
+func (r *taskPgRepository) WithSession(sess session) database.TaskRepository {
+	return &taskPgRepository{
+		db:    sess,
+		table: r.table,
 	}
 }
 
-func (r *InTaskRepository) Create(task *domain.SagaTask) (int64, error) {
-	query := `
-		INSERT INTO "go_saga_in_task" ("idempotency_key", "data", "rollback_data")
+func (r *taskPgRepository) Create(ctx context.Context, task *domain.SagaTask) (int64, error) {
+	query := fmt.Sprintf(`
+		INSERT INTO "%s" ("idempotency_key", "data", "rollback_data")
 		VALUES ($1, $2, $3)
 		RETURNING "id", "updated_at";
-	`
+	`, r.table)
 
-	err := r.db.QueryRow(r.ctx, query,
+	err := r.db.QueryRow(ctx, query,
 		task.IdempotencyKey,
 		task.Data,
 		task.RollbackData,
@@ -47,12 +63,12 @@ func (r *InTaskRepository) Create(task *domain.SagaTask) (int64, error) {
 	return task.ID, nil
 }
 
-func (r *InTaskRepository) GetByID(id int64) (*domain.SagaTask, error) {
-	query := `
+func (r *taskPgRepository) GetByID(ctx context.Context, id int64) (*domain.SagaTask, error) {
+	query := fmt.Sprintf(`
 		SELECT "id", "idempotency_key", "data", "rollback_data", "status", "info", "updated_at"
-		FROM "go_saga_in_task"
+		FROM "%s"
 		WHERE "id" = $1;
-	`
+	`, r.table)
 
 	var (
 		task     domain.SagaTask
@@ -60,7 +76,7 @@ func (r *InTaskRepository) GetByID(id int64) (*domain.SagaTask, error) {
 		rollback sql.NullString
 	)
 
-	err := r.db.QueryRow(r.ctx, query, id).Scan(
+	err := r.db.QueryRow(ctx, query, id).Scan(
 		&task.ID,
 		&task.IdempotencyKey,
 		&task.Data,
@@ -84,12 +100,12 @@ func (r *InTaskRepository) GetByID(id int64) (*domain.SagaTask, error) {
 	return &task, nil
 }
 
-func (r *InTaskRepository) GetByIdempotencyKey(key string) (*domain.SagaTask, error) {
-	query := `
+func (r *taskPgRepository) GetByIdempotencyKey(ctx context.Context, key string) (*domain.SagaTask, error) {
+	query := fmt.Sprintf(`
 		SELECT "id", "idempotency_key", "data", "rollback_data", "status", "info", "updated_at"
-		FROM "go_saga_in_task"
+		FROM "%s"
 		WHERE "idempotency_key" = $1;
-	`
+	`, r.table)
 
 	var (
 		task     domain.SagaTask
@@ -97,7 +113,7 @@ func (r *InTaskRepository) GetByIdempotencyKey(key string) (*domain.SagaTask, er
 		rollback sql.NullString
 	)
 
-	err := r.db.QueryRow(r.ctx, query, key).Scan(
+	err := r.db.QueryRow(ctx, query, key).Scan(
 		&task.ID,
 		&task.IdempotencyKey,
 		&task.Data,
@@ -121,8 +137,8 @@ func (r *InTaskRepository) GetByIdempotencyKey(key string) (*domain.SagaTask, er
 	return &task, nil
 }
 
-func (r *InTaskRepository) Update(task *domain.SagaTask) error {
-	return r.UpdateByID(task.ID, domain.SagaTaskUpdate{
+func (r *taskPgRepository) Update(ctx context.Context, task *domain.SagaTask) error {
+	return r.UpdateByID(ctx, task.ID, domain.SagaTaskUpdate{
 		IdempotencyKey: &task.IdempotencyKey,
 		Data:           &task.Data,
 		Status:         &task.Status,
@@ -130,31 +146,31 @@ func (r *InTaskRepository) Update(task *domain.SagaTask) error {
 	})
 }
 
-func (r *InTaskRepository) Delete(id int64) error {
-	query := `DELETE FROM "go_saga_in_task" WHERE "id" = $1;`
+func (r *taskPgRepository) Delete(ctx context.Context, id int64) error {
+	query := fmt.Sprintf(`DELETE FROM "%s" WHERE "id" = $1;`, r.table)
 
-	_, err := r.db.Exec(r.ctx, query, id)
+	_, err := r.db.Exec(ctx, query, id)
 	return err
 }
 
-func (r *InTaskRepository) UpdateByID(id int64, update domain.SagaTaskUpdate) error {
-	query, args, err := database.GenerateUpdateQueryById("go_saga_in_task", id, update)
+func (r *taskPgRepository) UpdateByID(ctx context.Context, id int64, update domain.SagaTaskUpdate) error {
+	query, args, err := database.GenerateUpdateQueryById(r.table, id, update)
 	if err != nil {
 		return err
 	}
 
-	_, err = r.db.Exec(r.ctx, query, args...)
+	_, err = r.db.Exec(ctx, query, args...)
 	return err
 }
 
-func (r *InTaskRepository) GetByStatus(status domain.TaskStatus) ([]domain.SagaTask, error) {
-	query := `
+func (r *taskPgRepository) GetByStatus(ctx context.Context, status domain.TaskStatus) ([]domain.SagaTask, error) {
+	query := fmt.Sprintf(`
 		SELECT "id", "idempotency_key", "data", "rollback_data", "status", "info", "updated_at"
-		FROM "go_saga_in_task"
+		FROM "%s"
 		WHERE "status" = $1;
-	`
+	`, r.table)
 
-	rows, err := r.db.Query(r.ctx, query, status)
+	rows, err := r.db.Query(ctx, query, status)
 	if err != nil {
 		return nil, err
 	}

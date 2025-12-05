@@ -5,6 +5,8 @@
 package kafka
 
 import (
+	"context"
+
 	"github.com/Filin153/gosaga/domain"
 	"github.com/IBM/sarama"
 	mock "github.com/stretchr/testify/mock"
@@ -38,16 +40,16 @@ func (_m *MockWriter) EXPECT() *MockWriter_Expecter {
 }
 
 // Write provides a mock function for the type MockWriter
-func (_mock *MockWriter) Write(msg *domain.SagaMsg, rollback *domain.SagaMsg, idempotencyKey string) error {
-	ret := _mock.Called(msg, rollback, idempotencyKey)
+func (_mock *MockWriter) Write(ctx context.Context, msg *domain.SagaMsg, rollback *domain.SagaMsg, idempotencyKey string) error {
+	ret := _mock.Called(ctx, msg, rollback, idempotencyKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Write")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*domain.SagaMsg, *domain.SagaMsg, string) error); ok {
-		r0 = returnFunc(msg, rollback, idempotencyKey)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *domain.SagaMsg, *domain.SagaMsg, string) error); ok {
+		r0 = returnFunc(ctx, msg, rollback, idempotencyKey)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -60,31 +62,37 @@ type MockWriter_Write_Call struct {
 }
 
 // Write is a helper method to define mock.On call
+//   - ctx context.Context
 //   - msg *domain.SagaMsg
 //   - rollback *domain.SagaMsg
 //   - idempotencyKey string
-func (_e *MockWriter_Expecter) Write(msg interface{}, rollback interface{}, idempotencyKey interface{}) *MockWriter_Write_Call {
-	return &MockWriter_Write_Call{Call: _e.mock.On("Write", msg, rollback, idempotencyKey)}
+func (_e *MockWriter_Expecter) Write(ctx interface{}, msg interface{}, rollback interface{}, idempotencyKey interface{}) *MockWriter_Write_Call {
+	return &MockWriter_Write_Call{Call: _e.mock.On("Write", ctx, msg, rollback, idempotencyKey)}
 }
 
-func (_c *MockWriter_Write_Call) Run(run func(msg *domain.SagaMsg, rollback *domain.SagaMsg, idempotencyKey string)) *MockWriter_Write_Call {
+func (_c *MockWriter_Write_Call) Run(run func(ctx context.Context, msg *domain.SagaMsg, rollback *domain.SagaMsg, idempotencyKey string)) *MockWriter_Write_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *domain.SagaMsg
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*domain.SagaMsg)
+			arg0 = args[0].(context.Context)
 		}
 		var arg1 *domain.SagaMsg
 		if args[1] != nil {
 			arg1 = args[1].(*domain.SagaMsg)
 		}
-		var arg2 string
+		var arg2 *domain.SagaMsg
 		if args[2] != nil {
-			arg2 = args[2].(string)
+			arg2 = args[2].(*domain.SagaMsg)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -95,7 +103,7 @@ func (_c *MockWriter_Write_Call) Return(err error) *MockWriter_Write_Call {
 	return _c
 }
 
-func (_c *MockWriter_Write_Call) RunAndReturn(run func(msg *domain.SagaMsg, rollback *domain.SagaMsg, idempotencyKey string) error) *MockWriter_Write_Call {
+func (_c *MockWriter_Write_Call) RunAndReturn(run func(ctx context.Context, msg *domain.SagaMsg, rollback *domain.SagaMsg, idempotencyKey string) error) *MockWriter_Write_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -174,8 +182,8 @@ func (_c *MockReader_Read_Call) RunAndReturn(run func() <-chan *sarama.ConsumerM
 }
 
 // Run provides a mock function for the type MockReader
-func (_mock *MockReader) Run() {
-	_mock.Called()
+func (_mock *MockReader) Run(ctx context.Context) {
+	_mock.Called(ctx)
 	return
 }
 
@@ -185,13 +193,20 @@ type MockReader_Run_Call struct {
 }
 
 // Run is a helper method to define mock.On call
-func (_e *MockReader_Expecter) Run() *MockReader_Run_Call {
-	return &MockReader_Run_Call{Call: _e.mock.On("Run")}
+//   - ctx context.Context
+func (_e *MockReader_Expecter) Run(ctx interface{}) *MockReader_Run_Call {
+	return &MockReader_Run_Call{Call: _e.mock.On("Run", ctx)}
 }
 
-func (_c *MockReader_Run_Call) Run(run func()) *MockReader_Run_Call {
+func (_c *MockReader_Run_Call) Run(run func(ctx context.Context)) *MockReader_Run_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -201,7 +216,7 @@ func (_c *MockReader_Run_Call) Return() *MockReader_Run_Call {
 	return _c
 }
 
-func (_c *MockReader_Run_Call) RunAndReturn(run func()) *MockReader_Run_Call {
+func (_c *MockReader_Run_Call) RunAndReturn(run func(ctx context.Context)) *MockReader_Run_Call {
 	_c.Run(run)
 	return _c
 }

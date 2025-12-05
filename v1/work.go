@@ -1,6 +1,7 @@
 package gosaga
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/Filin153/gosaga/domain"
@@ -9,20 +10,20 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (s *Saga[T]) outWork(task *domain.SagaTask, do func(task *domain.SagaTask, sess database.Session) error) error {
-	tx, err := s.pool.BeginTx(s.ctx, pgx.TxOptions{})
+func (s *Saga[T]) outWork(ctx context.Context, task *domain.SagaTask, do func(task *domain.SagaTask, sess database.Session) error) error {
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		slog.Error("outWork: pool.BeginTx", "error", err.Error(), "task_id", task.ID)
 		return err
 	}
-	defer tx.Rollback(s.ctx)
+	defer tx.Rollback(ctx)
 
 	outTaskRepoWithSession := s.outTaskRepo.WithSession(tx)
 	dlqOutTaskRepoWithSession := s.dlqOutTaskRepo.WithSession(tx)
 
 	info := "Start"
 	status := domain.TaskStatusWork
-	err = outTaskRepoWithSession.UpdateByID(task.ID, domain.SagaTaskUpdate{
+	err = outTaskRepoWithSession.UpdateByID(ctx, task.ID, domain.SagaTaskUpdate{
 		Status: &status,
 		Info:   &info,
 	})
@@ -35,7 +36,7 @@ func (s *Saga[T]) outWork(task *domain.SagaTask, do func(task *domain.SagaTask, 
 	if err != nil {
 		info := err.Error()
 		status := domain.TaskStatusError
-		err = outTaskRepoWithSession.UpdateByID(task.ID, domain.SagaTaskUpdate{
+		err = outTaskRepoWithSession.UpdateByID(ctx, task.ID, domain.SagaTaskUpdate{
 			Status: &status,
 			Info:   &info,
 		})
@@ -44,7 +45,7 @@ func (s *Saga[T]) outWork(task *domain.SagaTask, do func(task *domain.SagaTask, 
 			return err
 		}
 
-		DQLTask, err := dlqOutTaskRepoWithSession.GetByTaskID(task.ID)
+		DQLTask, err := dlqOutTaskRepoWithSession.GetByTaskID(ctx, task.ID)
 		if err != nil {
 			return err
 		}
@@ -53,14 +54,14 @@ func (s *Saga[T]) outWork(task *domain.SagaTask, do func(task *domain.SagaTask, 
 			dlqTask := domain.DLQTask{
 				TaskID: task.ID,
 			}
-			_, err := dlqOutTaskRepoWithSession.Create(&dlqTask)
+			_, err := dlqOutTaskRepoWithSession.Create(ctx, &dlqTask)
 			if err != nil {
 				slog.Error("outWork: dlqOutTaskRepo.Create", "error", err.Error(), "task_id", task.ID)
 				return err
 			}
 		}
 
-		if err := tx.Commit(s.ctx); err != nil {
+		if err := tx.Commit(ctx); err != nil {
 			slog.Error("outWork: tx.Commit (on error)", "error", err.Error(), "task_id", task.ID)
 		}
 		return err
@@ -68,7 +69,7 @@ func (s *Saga[T]) outWork(task *domain.SagaTask, do func(task *domain.SagaTask, 
 
 	info = "OK"
 	status = domain.TaskStatusReady
-	err = outTaskRepoWithSession.UpdateByID(task.ID, domain.SagaTaskUpdate{
+	err = outTaskRepoWithSession.UpdateByID(ctx, task.ID, domain.SagaTaskUpdate{
 		Status: &status,
 		Info:   &info,
 	})
@@ -77,7 +78,7 @@ func (s *Saga[T]) outWork(task *domain.SagaTask, do func(task *domain.SagaTask, 
 		return err
 	}
 
-	if err := tx.Commit(s.ctx); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		slog.Error("outWork: tx.Commit", "error", err.Error(), "task_id", task.ID)
 		return err
 	}
@@ -85,20 +86,20 @@ func (s *Saga[T]) outWork(task *domain.SagaTask, do func(task *domain.SagaTask, 
 	return nil
 }
 
-func (s *Saga[T]) inWork(task *domain.SagaTask, do func(task *domain.SagaTask, sess database.Session) error) error {
-	tx, err := s.pool.BeginTx(s.ctx, pgx.TxOptions{})
+func (s *Saga[T]) inWork(ctx context.Context, task *domain.SagaTask, do func(task *domain.SagaTask, sess database.Session) error) error {
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		slog.Error("inWork: pool.BeginTx", "error", err.Error(), "task_id", task.ID)
 		return err
 	}
-	defer tx.Rollback(s.ctx)
+	defer tx.Rollback(ctx)
 
 	inTaskRepoWithSession := s.inTaskRepo.WithSession(tx)
 	dlqInTaskRepoWithSession := s.dlqInTaskRepo.WithSession(tx)
 
 	info := "Start"
 	status := domain.TaskStatusWork
-	err = inTaskRepoWithSession.UpdateByID(task.ID, domain.SagaTaskUpdate{
+	err = inTaskRepoWithSession.UpdateByID(ctx, task.ID, domain.SagaTaskUpdate{
 		Status: &status,
 		Info:   &info,
 	})
@@ -111,7 +112,7 @@ func (s *Saga[T]) inWork(task *domain.SagaTask, do func(task *domain.SagaTask, s
 	if err != nil {
 		info := err.Error()
 		status := domain.TaskStatusError
-		err = inTaskRepoWithSession.UpdateByID(task.ID, domain.SagaTaskUpdate{
+		err = inTaskRepoWithSession.UpdateByID(ctx, task.ID, domain.SagaTaskUpdate{
 			Status: &status,
 			Info:   &info,
 		})
@@ -120,7 +121,7 @@ func (s *Saga[T]) inWork(task *domain.SagaTask, do func(task *domain.SagaTask, s
 			return err
 		}
 
-		dlqTask, err := dlqInTaskRepoWithSession.GetByTaskID(task.ID)
+		dlqTask, err := dlqInTaskRepoWithSession.GetByTaskID(ctx, task.ID)
 		if err != nil {
 			return err
 		}
@@ -129,14 +130,14 @@ func (s *Saga[T]) inWork(task *domain.SagaTask, do func(task *domain.SagaTask, s
 			newDlqTask := domain.DLQTask{
 				TaskID: task.ID,
 			}
-			_, err := dlqInTaskRepoWithSession.Create(&newDlqTask)
+			_, err := dlqInTaskRepoWithSession.Create(ctx, &newDlqTask)
 			if err != nil {
 				slog.Error("inWork: dlqInTaskRepo.Create", "error", err.Error(), "task_id", task.ID)
 				return err
 			}
 		}
 
-		if err := tx.Commit(s.ctx); err != nil {
+		if err := tx.Commit(ctx); err != nil {
 			slog.Error("inWork: tx.Commit (on error)", "error", err.Error(), "task_id", task.ID)
 		}
 		return err
@@ -144,7 +145,7 @@ func (s *Saga[T]) inWork(task *domain.SagaTask, do func(task *domain.SagaTask, s
 
 	info = "OK"
 	status = domain.TaskStatusReady
-	err = inTaskRepoWithSession.UpdateByID(task.ID, domain.SagaTaskUpdate{
+	err = inTaskRepoWithSession.UpdateByID(ctx, task.ID, domain.SagaTaskUpdate{
 		Status: &status,
 		Info:   &info,
 	})
@@ -153,7 +154,7 @@ func (s *Saga[T]) inWork(task *domain.SagaTask, do func(task *domain.SagaTask, s
 		return err
 	}
 
-	if err := tx.Commit(s.ctx); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		slog.Error("inWork: tx.Commit", "error", err.Error(), "task_id", task.ID)
 		return err
 	}
