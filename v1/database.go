@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// dataBaseTaskReader polls tasks with status wait and streams them to channel until context is done.
 func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskRepository) <-chan *domain.SagaTask {
 	taskMsg := make(chan *domain.SagaTask)
 	go func() {
@@ -73,6 +74,7 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 	return taskMsg
 }
 
+// dataBaseDLQTaskReader polls DLQ entries with status wait and streams their tasks.
 func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepository) <-chan *domain.SagaTask {
 	taskMsg := make(chan *domain.SagaTask)
 	go func() {

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// outWork executes outbound task handler inside transaction, managing statuses and DLQ.
 func (s *Saga) outWork(ctx context.Context, task *domain.SagaTask, do func(task *domain.SagaTask, sess database.Session) error) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -86,6 +87,7 @@ func (s *Saga) outWork(ctx context.Context, task *domain.SagaTask, do func(task 
 	return nil
 }
 
+// inWork executes inbound task handler with status updates and DLQ fallback.
 func (s *Saga) inWork(ctx context.Context, task *domain.SagaTask, do func(task *domain.SagaTask, sess database.Session) error) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

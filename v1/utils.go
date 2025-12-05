@@ -19,6 +19,7 @@ func Unmarshal(task *domain.SagaTask) (*domain.SagaMsg, error) {
 	return &msgData, nil
 }
 
+// generateIdempotencyKey produces a random hex string used to deduplicate tasks.
 func (k *Saga) generateIdempotencyKey() (string, error) {
 	bytes := make([]byte, 32)
 	_, err := rand.Read(bytes)

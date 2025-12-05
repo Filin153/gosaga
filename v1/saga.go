@@ -18,10 +18,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// txBeginner abstracts pgxpool.Pool/pgx.Conn for starting transactions.
 type txBeginner interface {
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
 }
 
+// Saga orchestrates saga tasks stored in Postgres and flowing through Kafka.
 type Saga struct {
 	pool           txBeginner
 	inTaskRepo     database.TaskRepository
@@ -35,6 +37,7 @@ type Saga struct {
 //go:embed pg-migration.sql
 var migrationSQL string
 
+// NewSaga initializes repositories, runs DB migration, and starts Kafka reader.
 func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, readerTopics, hosts []string, conf *sarama.Config) (*Saga, error) {
 	slog.Info("Saga.NewSaga: start")
 
@@ -69,8 +72,8 @@ func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, reader
 	}, nil
 }
 
-// Добавить алгоритм распределдения ресурсов чтобы небыло голодания
-// limiter для каждого из потоков, limiter * 4 = Все потоки
+// RunWorkers spins up workers for in/out tasks and their DLQ counterparts.
+// limiter caps concurrency per stream; total goroutines up to limiter*4.
 func (s *Saga) RunWorkers(ctx context.Context, limiter int, outWorker WorkerInterface, inWorker WorkerInterface) error {
 	slog.Info("Saga.RunWorkers: start", "limiter", limiter)
 	OutTaskWorkerCountLimiter := make(chan struct{}, limiter)
