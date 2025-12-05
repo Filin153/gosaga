@@ -88,7 +88,7 @@ func (s *Saga) outWork(ctx context.Context, task *domain.SagaTask, do func(task 
 }
 
 // inWork executes inbound task handler with status updates and DLQ fallback.
-func (s *Saga) inWork(ctx context.Context, task *domain.SagaTask, do func(task *domain.SagaTask, sess database.Session) error) error {
+func (s *Saga) inWork(ctx context.Context, task *domain.SagaTask, do func(ctx context.Context, task *domain.SagaTask, sess database.Session) error) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		slog.Error("inWork: pool.BeginTx", "error", err.Error(), "task_id", task.ID)
