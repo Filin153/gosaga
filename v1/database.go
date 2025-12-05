@@ -14,12 +14,7 @@ import (
 func (s *Saga[T]) dataBaseTaskReader(ctx context.Context, repo database.TaskRepository) <-chan *domain.SagaTask {
 	taskMsg := make(chan *domain.SagaTask)
 	go func() {
-		slog.Info("dataBaseTaskReader: wait for ctx.Done to close channel")
-		<-ctx.Done()
-		close(taskMsg)
-	}()
-
-	go func() {
+		defer close(taskMsg)
 		waitTime := 1
 		for {
 			select {
@@ -81,12 +76,7 @@ func (s *Saga[T]) dataBaseTaskReader(ctx context.Context, repo database.TaskRepo
 func (s *Saga[T]) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepository) <-chan *domain.SagaTask {
 	taskMsg := make(chan *domain.SagaTask)
 	go func() {
-		slog.Info("dataBaseDLQTaskReader: wait for ctx.Done to close channel")
-		<-ctx.Done()
-		close(taskMsg)
-	}()
-
-	go func() {
+		defer close(taskMsg)
 		waitTime := 1
 		for {
 			select {

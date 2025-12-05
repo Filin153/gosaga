@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/Filin153/gosaga/domain"
 	dbmocks "github.com/Filin153/gosaga/mocks/database"
@@ -13,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/mock"
+	"sync"
 )
 
 type stubBatchResults struct{}
@@ -23,6 +23,7 @@ func (stubBatchResults) Query() (pgx.Rows, error)         { return nil, nil }
 func (stubBatchResults) QueryRow() pgx.Row                { return nil }
 
 type stubTx struct {
+	mu            sync.Mutex
 	commitCount   int
 	rollbackCount int
 	execArgs      []any
@@ -32,11 +33,15 @@ type stubTx struct {
 
 func (s *stubTx) Begin(ctx context.Context) (pgx.Tx, error) { return s, nil }
 func (s *stubTx) Commit(ctx context.Context) error {
+	s.mu.Lock()
 	s.commitCount++
+	s.mu.Unlock()
 	return nil
 }
 func (s *stubTx) Rollback(ctx context.Context) error {
+	s.mu.Lock()
 	s.rollbackCount++
+	s.mu.Unlock()
 	return nil
 }
 func (s *stubTx) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
@@ -50,7 +55,9 @@ func (s *stubTx) Prepare(ctx context.Context, name, sql string) (*pgconn.Stateme
 	return nil, nil
 }
 func (s *stubTx) Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error) {
+	s.mu.Lock()
 	s.execArgs = append(s.execArgs, append([]any{sql}, arguments...)...)
+	s.mu.Unlock()
 	return pgconn.CommandTag{}, nil
 }
 func (s *stubTx) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
@@ -58,6 +65,16 @@ func (s *stubTx) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, 
 }
 func (s *stubTx) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row { return s.row }
 func (s *stubTx) Conn() *pgx.Conn                                               { return nil }
+func (s *stubTx) commits() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.commitCount
+}
+func (s *stubTx) rollbacks() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rollbackCount
+}
 
 type stubPool struct {
 	tx       *stubTx
@@ -111,8 +128,8 @@ func TestInWork_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inWork() error = %v", err)
 	}
-	if tx.commitCount != 1 {
-		t.Fatalf("expected commit once, got %d", tx.commitCount)
+	if tx.commits() != 1 {
+		t.Fatalf("expected commit once, got %d", tx.commits())
 	}
 }
 
@@ -158,8 +175,8 @@ func TestInWork_ErrorCreatesDLQ(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inWork() error = %v, want nil (current implementation overwrites worker error)", err)
 	}
-	if tx.commitCount != 1 {
-		t.Fatalf("expected commit once on error path, got %d", tx.commitCount)
+	if tx.commits() != 1 {
+		t.Fatalf("expected commit once on error path, got %d", tx.commits())
 	}
 }
 
@@ -195,8 +212,8 @@ func TestOutWork_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("outWork() error = %v", err)
 	}
-	if tx.commitCount != 1 {
-		t.Fatalf("expected commit once, got %d", tx.commitCount)
+	if tx.commits() != 1 {
+		t.Fatalf("expected commit once, got %d", tx.commits())
 	}
 }
 
@@ -239,55 +256,67 @@ func TestOutWork_ErrorCreatesDLQ(t *testing.T) {
 	if err != nil {
 		t.Fatalf("outWork() error = %v, want nil (current implementation overwrites worker error)", err)
 	}
-	if tx.commitCount != 1 {
-		t.Fatalf("expected commit once on error path, got %d", tx.commitCount)
+	if tx.commits() != 1 {
+		t.Fatalf("expected commit once on error path, got %d", tx.commits())
 	}
 }
 
 func TestDataBaseTaskReader_SendsTasks(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	tx := &stubTx{}
 	pool := &stubPool{tx: tx}
 	repo := dbmocks.NewMockTaskRepository(t)
 
 	s := &Saga[struct{}]{pool: pool}
 
-	repo.EXPECT().WithSession(tx).Return(repo)
-	repo.EXPECT().GetByStatus(ctx, domain.TaskStatusWait).Return([]domain.SagaTask{{ID: 1}}, nil)
+	repo.EXPECT().WithSession(tx).Return(repo).Maybe()
+	repo.EXPECT().GetByStatus(ctx, domain.TaskStatusWait).Return([]domain.SagaTask{{ID: 1}}, nil).Once()
+	repo.EXPECT().GetByStatus(ctx, domain.TaskStatusWait).Return(nil, nil).Maybe()
 
 	ch := s.dataBaseTaskReader(ctx, repo)
 
-	select {
-	case task := <-ch:
+	received := 0
+	for task := range ch {
+		received++
 		if task.ID != 1 {
 			t.Fatalf("expected task id 1, got %d", task.ID)
 		}
-	case <-time.After(time.Second):
-		t.Fatalf("did not receive task")
+		cancel() // stop reader goroutine after first message
+	}
+
+	if received < 1 {
+		t.Fatalf("received %d tasks, want >=1", received)
 	}
 }
 
 func TestDataBaseDLQTaskReader_SendsTasks(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	tx := &stubTx{}
 	pool := &stubPool{tx: tx}
 	repo := dbmocks.NewMockDLQRepository(t)
 
 	s := &Saga[struct{}]{pool: pool}
 
-	repo.EXPECT().WithSession(tx).Return(repo)
+	repo.EXPECT().WithSession(tx).Return(repo).Maybe()
 	repo.EXPECT().
 		GetByStatus(ctx, domain.TaskStatusWait).
-		Return([]domain.DLQEntry{{Task: domain.SagaTask{ID: 3}}}, nil)
+		Return([]domain.DLQEntry{{Task: domain.SagaTask{ID: 3}}}, nil).Once()
+	repo.EXPECT().
+		GetByStatus(ctx, domain.TaskStatusWait).
+		Return([]domain.DLQEntry{}, nil).Maybe()
 
 	ch := s.dataBaseDLQTaskReader(ctx, repo)
 
-	select {
-	case task := <-ch:
+	received := 0
+	for task := range ch {
+		received++
 		if task.ID != 3 {
 			t.Fatalf("expected task id 3, got %d", task.ID)
 		}
-	case <-time.After(time.Second):
-		t.Fatalf("did not receive task")
+		cancel()
+	}
+
+	if received < 1 {
+		t.Fatalf("received %d tasks, want >=1", received)
 	}
 }
