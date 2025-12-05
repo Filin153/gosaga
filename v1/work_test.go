@@ -119,7 +119,7 @@ func TestInWork_Success(t *testing.T) {
 		})).
 		Return(nil)
 
-	err := s.inWork(ctx, task, func(task *domain.SagaTask, sess database.Session) error {
+	err := s.inWork(ctx, task, func(ctx context.Context, task *domain.SagaTask, sess database.Session) error {
 		if sess != tx {
 			t.Fatalf("expected tx passed to worker")
 		}
@@ -169,7 +169,7 @@ func TestInWork_ErrorCreatesDLQ(t *testing.T) {
 	})).Return(int64(10), nil)
 
 	errSentinel := errors.New("boom")
-	err := s.inWork(ctx, task, func(task *domain.SagaTask, sess database.Session) error {
+	err := s.inWork(ctx, task, func(ctx context.Context, task *domain.SagaTask, sess database.Session) error {
 		return errSentinel
 	})
 	if err != nil {
@@ -206,7 +206,7 @@ func TestOutWork_Success(t *testing.T) {
 		})).
 		Return(nil)
 
-	err := s.outWork(ctx, task, func(task *domain.SagaTask, sess database.Session) error {
+	err := s.outWork(ctx, task, func(ctx context.Context, task *domain.SagaTask, sess database.Session) error {
 		return nil
 	})
 	if err != nil {
@@ -250,7 +250,7 @@ func TestOutWork_ErrorCreatesDLQ(t *testing.T) {
 	dlqRepo.EXPECT().GetByTaskID(ctx, int64(7)).Return(nil, nil)
 	dlqRepo.EXPECT().Create(ctx, mock.Anything).Return(int64(1), nil)
 
-	err := s.outWork(ctx, task, func(task *domain.SagaTask, sess database.Session) error {
+	err := s.outWork(ctx, task, func(ctx context.Context, task *domain.SagaTask, sess database.Session) error {
 		return errors.New("err")
 	})
 	if err != nil {
