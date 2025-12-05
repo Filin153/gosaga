@@ -2,7 +2,7 @@
 
 ## v1 (gosaga) quick guide
 
-Пакет `v1` реализует паттерн Saga с хранением задач в PostgreSQL и пересылкой сообщений через Kafka.
+Пакет `v1` реализует паттерн Saga с хранением задач в PostgreSQL и пересылкой сообщений через Kafka. При инициализации `NewSaga` автоматически выполняет миграцию из `v1/pg-migration.sql`.
 
 ### Требования
 - PostgreSQL, таблицы из `v1/pg-migration.sql`.
@@ -43,7 +43,7 @@ func main() {
     pool, _ := pgxpool.New(ctx, "postgres://user:pass@host/db")
     kafkaConf := sarama.NewConfig()
 
-    saga, _ := gosaga.NewSaga[struct{}](ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf)
+    saga, _ := gosaga.NewSaga(ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf)
 
     // limiter — параллелизм по каждому из 4 потоков (in/out/DLQ-in/DLQ-out)
     _ = saga.RunWorkers(ctx, 4, &demoWorker{}, &demoWorker{})
@@ -67,4 +67,3 @@ func main() {
 
 ### Моки
 - Пакеты `mocks/kafka`, `mocks/database`, `mocks/core/v1` содержат mockery/testify моки для Writer/Reader Kafka и репозиториев/воркера — пригодятся в тестах.
-
