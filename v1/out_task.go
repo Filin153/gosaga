@@ -49,7 +49,3 @@ func (w *OutWorker) Worker(ctx context.Context, task *domain.SagaTask, sess data
 func (w *OutWorker) DlqWorker(ctx context.Context, task *domain.SagaTask, sess database.Session) error {
 	return w.Worker(ctx, task, sess)
 }
-
-func (w *OutWorker) Rollback(task *domain.SagaTask, sess database.Session) error {
-	return nil
-}

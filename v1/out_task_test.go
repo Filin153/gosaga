@@ -85,13 +85,6 @@ func TestOutWorker_DlqWorker(t *testing.T) {
 	}
 }
 
-func TestOutWorker_Rollback(t *testing.T) {
-	worker := &OutWorker{}
-	if err := worker.Rollback(&domain.SagaTask{}, nil); err != nil {
-		t.Fatalf("Rollback() error = %v", err)
-	}
-}
-
 // assertErr is used as a sentinel error in writer expectations.
 type assertErr string
 
