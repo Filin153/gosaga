@@ -10,18 +10,59 @@ Saga helper with Postgres storage and Kafka transport. `NewSaga` auto-runs the m
 
 ### Interfaces
 - `WorkerInterface`: `New(ctx)`, `Worker(task, sess)`, `DlqWorker(task, sess)`
+- Built-in outbound worker: `v1/out_task.go` (`NewOutWorker(kafka.Writer)`) если нужно только публиковать в Kafka.
 - Task/DLQ repositories: ready-made PG impl (`storage/database/pg`), can be swapped
 
 ### Example
 ```go
-ctx := context.Background()
-pool, _ := pgxpool.New(ctx, "postgres://user:pass@host/db")
-kafkaConf := sarama.NewConfig()
+package main
 
-saga, _ := gosaga.NewSaga(ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf)
+import (
+    "context"
+    "log"
 
-_ = saga.RunWorkers(ctx, 4, &demoWorker{}, &demoWorker{})
-_ = saga.Write(ctx, &domain.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "out-topic"}, nil, func() {})
+    gosaga "github.com/Filin153/gosaga/v1"
+    "github.com/IBM/sarama"
+    "github.com/jackc/pgx/v5/pgxpool"
+)
+
+// inbound worker example
+type demoInWorker struct{}
+
+func (w *demoInWorker) New(ctx context.Context) (gosaga.WorkerInterface, error) { return w, nil }
+func (w *demoInWorker) Worker(task *gosaga.SagaTask, sess gosaga.Session) error {
+    // do something with task.Data
+    return nil
+}
+func (w *demoInWorker) DlqWorker(task *gosaga.SagaTask, sess gosaga.Session) error { return w.Worker(task, sess) }
+
+func main() {
+    ctx := context.Background()
+
+    pool, err := pgxpool.New(ctx, "postgres://user:pass@host/db")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    kafkaConf := sarama.NewConfig()
+    kafkaConf.Version = sarama.V3_6_0_0
+
+    saga, err := gosaga.NewSaga(ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // outWorker publishes to Kafka using built-in OutWorker
+    kafkaWriter, _ := gosaga.NewKafkaWriter([]string{"kafka:9092"}, kafkaConf)
+    outWorker := gosaga.NewOutWorker(kafkaWriter)
+
+    if err := saga.RunWorkers(ctx, 4, outWorker, &demoInWorker{}); err != nil {
+        log.Fatal(err)
+    }
+
+    // write outgoing task to out-topic
+    _ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "out-topic"}, nil, func() {})
+}
 ```
 
 ### Key methods
@@ -51,18 +92,59 @@ _ = saga.Write(ctx, &domain.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"
 
 ### Интерфейсы
 - `WorkerInterface`: `New(ctx)`, `Worker(task, sess)`, `DlqWorker(task, sess)`
+- Готовый воркер для исходящих задач: `v1/out_task.go` (`NewOutWorker(kafka.Writer)`), если нужно просто публиковать в Kafka.
 - Репозитории задач/DLQ: готовая PG-реализация (`storage/database/pg`), можно подменять
 
 ### Пример
 ```go
-ctx := context.Background()
-pool, _ := pgxpool.New(ctx, "postgres://user:pass@host/db")
-kafkaConf := sarama.NewConfig()
+package main
 
-saga, _ := gosaga.NewSaga(ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf)
+import (
+    "context"
+    "log"
 
-_ = saga.RunWorkers(ctx, 4, &demoWorker{}, &demoWorker{})
-_ = saga.Write(ctx, &domain.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "out-topic"}, nil, func() {})
+    gosaga "github.com/Filin153/gosaga/v1"
+    "github.com/IBM/sarama"
+    "github.com/jackc/pgx/v5/pgxpool"
+)
+
+// пример воркера для входящих задач
+type demoInWorker struct{}
+
+func (w *demoInWorker) New(ctx context.Context) (gosaga.WorkerInterface, error) { return w, nil }
+func (w *demoInWorker) Worker(task *gosaga.SagaTask, sess gosaga.Session) error {
+    // обработка task.Data, работа в транзакции sess
+    return nil
+}
+func (w *demoInWorker) DlqWorker(task *gosaga.SagaTask, sess gosaga.Session) error { return w.Worker(task, sess) }
+
+func main() {
+    ctx := context.Background()
+
+    pool, err := pgxpool.New(ctx, "postgres://user:pass@host/db")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    kafkaConf := sarama.NewConfig()
+    kafkaConf.Version = sarama.V3_6_0_0
+
+    saga, err := gosaga.NewSaga(ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // готовый outWorker для публикации в Kafka (создаем реальный writer)
+    kafkaWriter, _ := gosaga.NewKafkaWriter([]string{"kafka:9092"}, kafkaConf)
+    outWorker := gosaga.NewOutWorker(kafkaWriter)
+
+    if err := saga.RunWorkers(ctx, 4, outWorker, &demoInWorker{}); err != nil {
+        log.Fatal(err)
+    }
+
+    // запись исходящей задачи в out-topic
+    _ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "out-topic"}, nil, func() {})
+}
 ```
 
 ### Основные методы
