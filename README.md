@@ -11,10 +11,14 @@ Saga helper with Postgres storage and Kafka transport. `NewSaga`:
 - PostgreSQL tables from `v1/pg-migration.sql`
 - `pgxpool.Pool`
 - Kafka + `sarama.Config`
+- Migration creates PK columns without auto-increment; configure sequences/defaults or provide IDs yourself if you change schema.
 
 ### Interfaces & exports
-- `WorkerInterface`: `New(ctx)`, `Worker(task, sess)`, `DlqWorker(task, sess)`
-- Built-in outbound worker: `NewOutWorker(kafka.Writer)` (publish to Kafka)
+- `WorkerInterface`:
+  - `New(ctx context.Context) (WorkerInterface, error)`
+  - `Worker(ctx context.Context, task *SagaTask, sess Session) error`
+  - `DlqWorker(ctx context.Context, task *SagaTask, sess Session) error`
+- Built-in outbound handler: `NewOutWorker(kafka.Writer)` provides `Worker/DlqWorker`; wrap it with a tiny struct implementing `New` to satisfy the interface (see example).
 - Aliases in this package: `SagaMsg`, `SagaTask`, `TaskStatus`, `Session`, `TaskRepository`, `DLQRepository`
 - Kafka helpers: `NewKafkaWriter(...)`, `NewKafkaReader(...)`
 - Task/DLQ repositories: PG impl (`storage/database/pg`), swappable
@@ -36,11 +40,18 @@ import (
 type demoInWorker struct{}
 
 func (w *demoInWorker) New(ctx context.Context) (gosaga.WorkerInterface, error) { return w, nil }
-func (w *demoInWorker) Worker(task *gosaga.SagaTask, sess gosaga.Session) error {
-    // do something with task.Data
+func (w *demoInWorker) Worker(ctx context.Context, task *gosaga.SagaTask, sess gosaga.Session) error {
+    // do something with task.Data inside sess (pgx.Tx)
     return nil
 }
-func (w *demoInWorker) DlqWorker(task *gosaga.SagaTask, sess gosaga.Session) error { return w.Worker(task, sess) }
+func (w *demoInWorker) DlqWorker(ctx context.Context, task *gosaga.SagaTask, sess gosaga.Session) error {
+    return w.Worker(ctx, task, sess)
+}
+
+// thin wrapper so OutWorker satisfies WorkerInterface (adds New)
+type demoOutWorker struct{ *gosaga.OutWorker }
+
+func (w *demoOutWorker) New(ctx context.Context) (gosaga.WorkerInterface, error) { return w, nil }
 
 func main() {
     ctx := context.Background()
@@ -60,7 +71,7 @@ func main() {
 
     // outWorker publishes to Kafka using built-in OutWorker
     kafkaWriter, _ := gosaga.NewKafkaWriter([]string{"kafka:9092"}, kafkaConf)
-    outWorker := gosaga.NewOutWorker(kafkaWriter)
+    outWorker := &demoOutWorker{gosaga.NewOutWorker(kafkaWriter)}
 
     if err := saga.RunWorkers(ctx, 4, outWorker, &demoInWorker{}); err != nil {
         log.Fatal(err)
@@ -99,10 +110,14 @@ func main() {
 - PostgreSQL с таблицами из `v1/pg-migration.sql`
 - `pgxpool.Pool`
 - Kafka + `sarama.Config`
+- В миграции PK колонка без автоинкремента: добавьте sequence/DEFAULT в своей схеме или задавайте ID вручную, если меняете DDL.
 
 ### Интерфейсы и экспорты
-- `WorkerInterface`: `New(ctx)`, `Worker(task, sess)`, `DlqWorker(task, sess)`
-- Готовый воркер для исходящих задач: `NewOutWorker(kafka.Writer)` (публикация в Kafka)
+- `WorkerInterface`:
+  - `New(ctx context.Context) (WorkerInterface, error)`
+  - `Worker(ctx context.Context, task *SagaTask, sess Session) error`
+  - `DlqWorker(ctx context.Context, task *SagaTask, sess Session) error`
+- Готовый обработчик исходящих задач: `NewOutWorker(kafka.Writer)` реализует `Worker/DlqWorker`; оберните в структуру с методом `New`, чтобы соответствовать интерфейсу (см. пример).
 - Алиасы: `SagaMsg`, `SagaTask`, `TaskStatus`, `Session`, `TaskRepository`, `DLQRepository`
 - Kafka-хелперы: `NewKafkaWriter(...)`, `NewKafkaReader(...)`
 - Репозитории задач/DLQ: PG-реализация (`storage/database/pg`), можно подменять
@@ -116,7 +131,6 @@ import (
     "log"
 
     gosaga "github.com/Filin153/gosaga/v1"
-    "github.com/Filin153/gosaga/storage/broker/kafka"
     "github.com/IBM/sarama"
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -125,11 +139,18 @@ import (
 type demoInWorker struct{}
 
 func (w *demoInWorker) New(ctx context.Context) (gosaga.WorkerInterface, error) { return w, nil }
-func (w *demoInWorker) Worker(task *gosaga.SagaTask, sess gosaga.Session) error {
+func (w *demoInWorker) Worker(ctx context.Context, task *gosaga.SagaTask, sess gosaga.Session) error {
     // обработка task.Data, работа в транзакции sess
     return nil
 }
-func (w *demoInWorker) DlqWorker(task *gosaga.SagaTask, sess gosaga.Session) error { return w.Worker(task, sess) }
+func (w *demoInWorker) DlqWorker(ctx context.Context, task *gosaga.SagaTask, sess gosaga.Session) error {
+    return w.Worker(ctx, task, sess)
+}
+
+// обертка, добавляющая метод New к готовому OutWorker
+type demoOutWorker struct{ *gosaga.OutWorker }
+
+func (w *demoOutWorker) New(ctx context.Context) (gosaga.WorkerInterface, error) { return w, nil }
 
 func main() {
     ctx := context.Background()
@@ -149,7 +170,7 @@ func main() {
 
     // готовый outWorker для публикации в Kafka (создаем реальный writer)
     kafkaWriter, _ := gosaga.NewKafkaWriter([]string{"kafka:9092"}, kafkaConf)
-    outWorker := gosaga.NewOutWorker(kafkaWriter)
+    outWorker := &demoOutWorker{gosaga.NewOutWorker(kafkaWriter)}
 
     if err := saga.RunWorkers(ctx, 4, outWorker, &demoInWorker{}); err != nil {
         log.Fatal(err)

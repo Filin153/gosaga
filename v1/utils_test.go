@@ -1,69 +1,72 @@
 package gosaga
 
 import (
+	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"sync"
 	"testing"
 
 	"github.com/Filin153/gosaga/domain"
+	"github.com/stretchr/testify/require"
 )
 
-func TestUnmarshal_Success(t *testing.T) {
-	task := &domain.SagaTask{
-		Data: mustJSON(t, domain.SagaMsg{
-			Key:   "k",
-			Value: "v",
-			Topic: "t",
-		}),
-	}
-
-	got, err := Unmarshal(task)
-	if err != nil {
-		t.Fatalf("Unmarshal() error = %v", err)
-	}
-
-	if got.Key != "k" || got.Topic != "t" {
-		t.Fatalf("Unmarshal() = %+v, want key=k topic=t", got)
-	}
-	if got.Value != "v" {
-		t.Fatalf("Unmarshal().Value = %v, want %v", got.Value, "v")
-	}
+func TestUnmarshal(t *testing.T) {
+	task := domain.SagaTask{Data: json.RawMessage(`{"Key":"k","Value":{"a":1},"Topic":"t"}`)}
+	msg, err := Unmarshal(&task)
+	require.NoError(t, err)
+	require.Equal(t, "k", msg.Key)
+	require.Equal(t, "t", msg.Topic)
 }
 
-func TestUnmarshal_InvalidJSON(t *testing.T) {
-	task := &domain.SagaTask{
-		Data: []byte(`{invalid json`),
-	}
-
-	if _, err := Unmarshal(task); err == nil {
-		t.Fatalf("Unmarshal() error = nil, want non-nil")
-	}
+func TestUnmarshalError(t *testing.T) {
+	task := domain.SagaTask{Data: json.RawMessage(`{`)}
+	_, err := Unmarshal(&task)
+	require.Error(t, err)
 }
 
 func TestGenerateIdempotencyKey(t *testing.T) {
-	var s Saga
-
-	key1, err := s.generateIdempotencyKey()
-	if err != nil {
-		t.Fatalf("generateIdempotencyKey() error = %v", err)
-	}
-	if len(key1) == 0 {
-		t.Fatalf("generateIdempotencyKey() returned empty key")
-	}
-
-	key2, err := s.generateIdempotencyKey()
-	if err != nil {
-		t.Fatalf("generateIdempotencyKey() second call error = %v", err)
-	}
-	if key1 == key2 {
-		t.Fatalf("generateIdempotencyKey() produced equal keys on two calls")
-	}
+	s := &Saga{}
+	key, err := s.generateIdempotencyKey()
+	require.NoError(t, err)
+	require.Len(t, key, 64)
+	_, err = hex.DecodeString(key)
+	require.NoError(t, err)
 }
 
-func mustJSON(t *testing.T, v any) json.RawMessage {
-	t.Helper()
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatalf("json.Marshal error: %v", err)
+func TestGenerateIdempotencyKeyError(t *testing.T) {
+	oldRand := randReader
+	randReader = func(b []byte) (int, error) { return 0, errors.New("boom") }
+	defer func() { randReader = oldRand }()
+
+	s := &Saga{}
+	_, err := s.generateIdempotencyKey()
+	require.EqualError(t, err, "boom")
+}
+
+func TestGenerateIdempotencyKeyParallel5000(t *testing.T) {
+	s := &Saga{}
+	const count = 5000
+	keys := make([]string, count)
+
+	var wg sync.WaitGroup
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			key, err := s.generateIdempotencyKey()
+			require.NoError(t, err)
+			keys[idx] = key
+		}(i)
 	}
-	return b
+	wg.Wait()
+
+	seen := make(map[string]struct{}, count)
+	for _, k := range keys {
+		if _, ok := seen[k]; ok {
+			t.Fatalf("duplicate key: %s", k)
+		}
+		seen[k] = struct{}{}
+		require.Len(t, k, 64)
+	}
 }

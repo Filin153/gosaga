@@ -2,156 +2,162 @@ package gosaga
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Filin153/gosaga/domain"
-	dbmocks "github.com/Filin153/gosaga/mocks/database"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
-func TestSagaWrite_Success(t *testing.T) {
-	ctx := context.Background()
-	repo := dbmocks.NewMockTaskRepository(t)
+func TestWriteSuccess(t *testing.T) {
+	repo := &stubTaskRepo{}
+	s := &Saga{outTaskRepo: repo}
+	rollbackCalled := atomic.Int32{}
 
-	s := &Saga{
-		outTaskRepo: repo,
-	}
+	msg := &domain.SagaMsg{Key: "k", Value: map[string]any{"a": 1}, Topic: "topic"}
+	err := s.Write(context.Background(), msg, nil, func() { rollbackCalled.Add(1) })
+	require.NoError(t, err)
+	require.Zero(t, rollbackCalled.Load())
 
-	msg := &domain.SagaMsg{
-		Key:   "key",
-		Value: map[string]string{"foo": "bar"},
-		Topic: "topic",
-	}
-
-	repo.EXPECT().
-		Create(ctx, mock.MatchedBy(func(task *domain.SagaTask) bool {
-			if task.IdempotencyKey == "" {
-				return false
-			}
-			var got domain.SagaMsg
-			if err := json.Unmarshal(task.Data, &got); err != nil {
-				return false
-			}
-			return got.Key == msg.Key && got.Topic == msg.Topic
-		})).
-		Return(int64(1), nil)
-
-	rollbackCalled := false
-	err := s.Write(ctx, msg, nil, func() { rollbackCalled = true })
-	if err != nil {
-		t.Fatalf("Write() error = %v", err)
-	}
-	if rollbackCalled {
-		t.Fatalf("Write() called rollbackFunc on success")
-	}
+	repo.mu.Lock()
+	require.Len(t, repo.created, 1)
+	require.NotNil(t, repo.created[0].Data)
+	require.NotEmpty(t, repo.created[0].IdempotencyKey)
+	require.Nil(t, repo.created[0].RollbackData)
+	repo.mu.Unlock()
 }
 
-func TestSagaWrite_CreateErrorTriggersRollback(t *testing.T) {
-	ctx := context.Background()
-	repo := dbmocks.NewMockTaskRepository(t)
+func TestWriteCreateErrorTriggersRollback(t *testing.T) {
+	repo := &stubTaskRepo{createErr: errors.New("create fail")}
+	s := &Saga{outTaskRepo: repo}
+	rollbackCalled := atomic.Int32{}
 
-	s := &Saga{
-		outTaskRepo: repo,
-	}
-
-	msg := &domain.SagaMsg{
-		Key:   "key",
-		Value: "value",
-		Topic: "topic",
-	}
-
-	repo.EXPECT().
-		Create(ctx, mock.AnythingOfType("*domain.SagaTask")).
-		Return(int64(0), errors.New("create error"))
-
-	var mu sync.Mutex
-	rollbackCalled := false
-	err := s.Write(ctx, msg, nil, func() {
-		mu.Lock()
-		defer mu.Unlock()
-		rollbackCalled = true
-	})
-	if err == nil {
-		t.Fatalf("Write() error = nil, want non-nil")
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-	if !rollbackCalled {
-		t.Fatalf("Write() did not call rollbackFunc when Create failed")
-	}
+	err := s.Write(context.Background(), &domain.SagaMsg{}, nil, func() { rollbackCalled.Add(1) })
+	require.EqualError(t, err, "create fail")
+	require.Equal(t, int32(1), rollbackCalled.Load())
 }
 
-func TestSagaAsyncWrite_Success(t *testing.T) {
-	ctx := context.Background()
-	repo := dbmocks.NewMockTaskRepository(t)
+func TestWriteMarshalError(t *testing.T) {
+	repo := &stubTaskRepo{}
+	s := &Saga{outTaskRepo: repo}
+	rollbackCalled := atomic.Int32{}
 
-	s := &Saga{
-		outTaskRepo: repo,
-	}
+	err := s.Write(context.Background(), &domain.SagaMsg{Value: make(chan int)}, nil, func() { rollbackCalled.Add(1) })
+	require.Error(t, err)
+	require.Equal(t, int32(1), rollbackCalled.Load())
+}
 
-	msg := &domain.SagaMsg{
-		Key:   "key",
-		Value: "value",
-		Topic: "topic",
-	}
+func TestWriteRandError(t *testing.T) {
+	oldRand := randReader
+	randReader = func(b []byte) (int, error) { return 0, errors.New("rand fail") }
+	defer func() { randReader = oldRand }()
+
+	repo := &stubTaskRepo{}
+	s := &Saga{outTaskRepo: repo}
+	rollbackCalled := atomic.Int32{}
+
+	err := s.Write(context.Background(), &domain.SagaMsg{}, nil, func() { rollbackCalled.Add(1) })
+	require.EqualError(t, err, "rand fail")
+	require.Equal(t, int32(1), rollbackCalled.Load())
+}
+
+func TestAsyncWriteSuccess(t *testing.T) {
+	repo := &stubTaskRepo{}
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	repo.wg = &wg
+
+	s := &Saga{outTaskRepo: repo}
+	rollbackCalled := atomic.Int32{}
+
+	err := s.AsyncWrite(context.Background(), &domain.SagaMsg{Key: "k", Value: map[string]int{"a": 1}, Topic: "topic"}, nil, func() { rollbackCalled.Add(1) })
+	require.NoError(t, err)
 
 	done := make(chan struct{})
-	repo.EXPECT().
-		Create(ctx, mock.AnythingOfType("*domain.SagaTask")).
-		Run(func(_ context.Context, _ *domain.SagaTask) {
-			close(done)
-		}).
-		Return(int64(1), nil)
-
-	rollbackCalled := false
-	err := s.AsyncWrite(ctx, msg, nil, func() { rollbackCalled = true })
-	if err != nil {
-		t.Fatalf("AsyncWrite() error = %v", err)
-	}
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
 
 	select {
 	case <-done:
-	case <-time.After(time.Second):
-		t.Fatalf("AsyncWrite() did not call Create in time")
+	case <-time.After(2 * time.Second):
+		t.Fatalf("async create did not finish")
 	}
 
-	if rollbackCalled {
-		t.Fatalf("AsyncWrite() called rollbackFunc on success")
-	}
+	require.Zero(t, rollbackCalled.Load())
+	repo.mu.Lock()
+	require.Len(t, repo.created, 1)
+	repo.mu.Unlock()
 }
 
-func TestSagaAsyncWrite_CreateErrorTriggersRollback(t *testing.T) {
-	ctx := context.Background()
-	repo := dbmocks.NewMockTaskRepository(t)
+func TestAsyncWriteCreateErrorTriggersRollback(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	repo := &stubTaskRepo{createErr: errors.New("create boom"), wg: &wg}
+	s := &Saga{outTaskRepo: repo}
+	rollbackCalled := atomic.Int32{}
 
-	s := &Saga{
-		outTaskRepo: repo,
-	}
+	err := s.AsyncWrite(context.Background(), &domain.SagaMsg{}, nil, func() { rollbackCalled.Add(1) })
+	require.NoError(t, err)
 
-	msg := &domain.SagaMsg{
-		Key:   "key",
-		Value: "value",
-		Topic: "topic",
-	}
-
-	repo.EXPECT().
-		Create(ctx, mock.AnythingOfType("*domain.SagaTask")).
-		Return(int64(0), errors.New("create error"))
-
-	ch := make(chan struct{})
-	err := s.AsyncWrite(ctx, msg, nil, func() { close(ch) })
-	if err != nil {
-		t.Fatalf("AsyncWrite() error = %v", err)
-	}
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
 
 	select {
-	case <-ch:
+	case <-done:
 	case <-time.After(2 * time.Second):
-		t.Fatalf("AsyncWrite() did not call rollbackFunc after Create error")
+		t.Fatalf("async create did not finish")
 	}
+
+	require.Eventually(t, func() bool { return rollbackCalled.Load() == 1 }, time.Second, 10*time.Millisecond)
+}
+
+func TestAsyncWriteEarlyError(t *testing.T) {
+	oldRand := randReader
+	randReader = func(b []byte) (int, error) { return 0, errors.New("rand fail") }
+	defer func() { randReader = oldRand }()
+
+	s := &Saga{outTaskRepo: &stubTaskRepo{}}
+	rollbackCalled := atomic.Int32{}
+
+	err := s.AsyncWrite(context.Background(), &domain.SagaMsg{}, nil, func() { rollbackCalled.Add(1) })
+	require.EqualError(t, err, "rand fail")
+	require.Eventually(t, func() bool { return rollbackCalled.Load() == 1 }, time.Second, 10*time.Millisecond)
+}
+
+func TestAsyncWriteRace5000(t *testing.T) {
+	const count = 5000
+	wg := sync.WaitGroup{}
+	wg.Add(count)
+
+	repo := &stubTaskRepo{wg: &wg}
+	s := &Saga{outTaskRepo: repo}
+
+	for i := 0; i < count; i++ {
+		err := s.AsyncWrite(context.Background(), &domain.SagaMsg{Key: "k", Value: map[string]int{"a": i}, Topic: "topic"}, &domain.SagaMsg{Key: "rb"}, func() {})
+		require.NoError(t, err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timeout waiting for async writes")
+	}
+
+	repo.mu.Lock()
+	require.Len(t, repo.created, count)
+	repo.mu.Unlock()
 }
