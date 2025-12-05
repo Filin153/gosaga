@@ -1,0 +1,15 @@
+packages:
+  github.com/Filin153/gosaga/v1:
+    config:
+      all: true
+      dir: mocks/core/v1
+
+  github.com/Filin153/gosaga/storage/broker/kafka:
+    config:
+      all: true
+      dir: mocks/kafka
+
+  github.com/Filin153/gosaga/storage/database:
+    config:
+      all: true
+      dir: mocks/database
