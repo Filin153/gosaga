@@ -1,5 +1,3 @@
-# github.com/Filin153/gosaga
-
 ## EN
 Saga helper with Postgres storage and Kafka transport. `NewSaga` auto-runs the migration from `v1/pg-migration.sql`, builds repos, and starts Kafka reader.
 
