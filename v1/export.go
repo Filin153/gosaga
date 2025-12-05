@@ -10,12 +10,12 @@ import (
 
 // Aliases for domain types.
 type (
-	SagaMsg     = domain.SagaMsg
-	SagaTask    = domain.SagaTask
-	TaskStatus  = domain.TaskStatus
+	SagaMsg        = domain.SagaMsg
+	SagaTask       = domain.SagaTask
+	TaskStatus     = domain.TaskStatus
 	SagaTaskUpdate = domain.SagaTaskUpdate
-	DLQTask     = domain.DLQTask
-	DLQEntry    = domain.DLQEntry
+	DLQTask        = domain.DLQTask
+	DLQEntry       = domain.DLQEntry
 )
 
 // Aliases for repositories.

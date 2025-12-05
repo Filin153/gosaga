@@ -27,7 +27,7 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 				})
 				if err != nil {
 					slog.Error("pool.BeginTx", "error", err.Error())
-					time.Sleep(time.Duration(waitTime) * time.Second)
+					sleep(time.Duration(waitTime) * time.Second)
 					waitTime *= 2
 					continue
 				}
@@ -38,7 +38,7 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 					if err := tx.Rollback(ctx); err != nil {
 						slog.Error("dataBaseTaskReader: GetByStatus error, rollback", "error", err.Error())
 					}
-					time.Sleep(time.Duration(waitTime) * time.Second)
+					sleep(time.Duration(waitTime) * time.Second)
 					waitTime *= 2
 					continue
 				}
@@ -48,7 +48,7 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 					if err := tx.Rollback(ctx); err != nil {
 						slog.Error("dataBaseTaskReader: tx.Commit error, rollback", "error", err.Error())
 					}
-					time.Sleep(time.Duration(waitTime) * time.Second)
+					sleep(time.Duration(waitTime) * time.Second)
 					waitTime *= 2
 					continue
 				}
@@ -74,7 +74,7 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 	return taskMsg
 }
 
-// dataBaseDLQTaskReader polls DLQ entries with status wait and streams their tasks.
+// dataBaseDLQTaskReader polls DLQ entries with status error and streams their tasks.
 func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepository) <-chan *domain.SagaTask {
 	taskMsg := make(chan *domain.SagaTask)
 	go func() {
@@ -90,18 +90,18 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 				})
 				if err != nil {
 					slog.Error("dataBaseDLQTaskReader: pool.BeginTx error", "error", err.Error())
-					time.Sleep(time.Duration(waitTime) * time.Second)
+					sleep(time.Duration(waitTime) * time.Second)
 					waitTime *= 2
 					continue
 				}
 
-				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusWait)
+				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusError)
 				if err != nil {
 					slog.Error("dataBaseDLQTaskReader: GetByStatus error", "error", err.Error())
 					if err := tx.Rollback(ctx); err != nil {
 						slog.Error("dataBaseDLQTaskReader: GetByStatus error, rollback", "error", err.Error())
 					}
-					time.Sleep(time.Duration(waitTime) * time.Second)
+					sleep(time.Duration(waitTime) * time.Second)
 					waitTime *= 2
 					continue
 				}
@@ -111,7 +111,7 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 					if err := tx.Rollback(ctx); err != nil {
 						slog.Error("dataBaseDLQTaskReader: tx.Commit error, rollback", "error", err.Error())
 					}
-					time.Sleep(time.Duration(waitTime) * time.Second)
+					sleep(time.Duration(waitTime) * time.Second)
 					waitTime *= 2
 					continue
 				}

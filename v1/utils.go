@@ -1,11 +1,11 @@
 package gosaga
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/Filin153/gosaga/domain"
 	"log/slog"
+
+	"github.com/Filin153/gosaga/domain"
 )
 
 func Unmarshal(task *domain.SagaTask) (*domain.SagaMsg, error) {
@@ -22,7 +22,7 @@ func Unmarshal(task *domain.SagaTask) (*domain.SagaMsg, error) {
 // generateIdempotencyKey produces a random hex string used to deduplicate tasks.
 func (k *Saga) generateIdempotencyKey() (string, error) {
 	bytes := make([]byte, 32)
-	_, err := rand.Read(bytes)
+	_, err := randReader(bytes)
 	if err != nil {
 		return "", err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -126,7 +127,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, outWorker WorkerInte
 			if task != nil {
 				slog.Info("Saga.RunWorkers: skip duplicated message by idempotency_key", "idempotency_key", msgIdempotencyKey)
 				continue
-			} else if err != nil {
+			} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				slog.Error("Saga.RunWorkers: inTaskRepo.GetByIdempotencyKey", "error", err.Error(), "idempotency_key", msgIdempotencyKey)
 				continue
 			}
@@ -149,7 +150,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, outWorker WorkerInte
 	go func() {
 		slog.Info("Saga.RunWorkers: start rollback loop")
 		for {
-			time.Sleep(10 * time.Second)
+			sleep(10 * time.Second)
 
 			errTasks, err := s.dlqInTaskRepo.GetErrorsWithAttempts(ctx)
 			if err != nil {
@@ -158,38 +159,43 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, outWorker WorkerInte
 			}
 
 			for _, task := range errTasks {
-				var rollBackMsg domain.SagaMsg
-				if task.Task.RollbackData == nil {
-					status := domain.TaskStatusErrorRollbackNone
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					var rollBackMsg domain.SagaMsg
+					if task.Task.RollbackData == nil {
+						status := domain.TaskStatusErrorRollbackNone
+						err = s.inTaskRepo.UpdateByID(ctx, task.Task.ID, domain.SagaTaskUpdate{
+							Status: &status,
+						})
+						if err != nil {
+							slog.Error("Saga.RunWorkers: inTaskRepo.UpdateByID (no rollback data)", "error", err.Error(), "task_id", task.Task.ID)
+							continue
+						}
+						continue
+					}
+
+					err := json.Unmarshal(*task.Task.RollbackData, &rollBackMsg)
+					if err != nil {
+						slog.Error("Saga.RunWorkers: json.Unmarshal rollbackData", "error", err.Error(), "task_id", task.Task.ID)
+						continue
+					}
+
+					err = s.Write(ctx, &rollBackMsg, nil, func() {})
+					if err != nil {
+						slog.Error("Saga.RunWorkers: Write rollback message", "error", err.Error())
+						continue
+					}
+
+					status := domain.TaskStatusRollback
 					err = s.inTaskRepo.UpdateByID(ctx, task.Task.ID, domain.SagaTaskUpdate{
 						Status: &status,
 					})
 					if err != nil {
-						slog.Error("Saga.RunWorkers: inTaskRepo.UpdateByID (no rollback data)", "error", err.Error(), "task_id", task.Task.ID)
+						slog.Error("Saga.RunWorkers: inTaskRepo.UpdateByID (set rollback)", "error", err.Error(), "task_id", task.Task.ID)
 						continue
 					}
-					continue
-				}
-
-				err := json.Unmarshal(*task.Task.RollbackData, &rollBackMsg)
-				if err != nil {
-					slog.Error("Saga.RunWorkers: json.Unmarshal rollbackData", "error", err.Error(), "task_id", task.Task.ID)
-					continue
-				}
-
-				err = s.Write(ctx, &rollBackMsg, nil, func() {})
-				if err != nil {
-					slog.Error("Saga.RunWorkers: Write rollback message", "error", err.Error())
-					continue
-				}
-
-				status := domain.TaskStatusRollback
-				err = s.inTaskRepo.UpdateByID(ctx, task.Task.ID, domain.SagaTaskUpdate{
-					Status: &status,
-				})
-				if err != nil {
-					slog.Error("Saga.RunWorkers: inTaskRepo.UpdateByID (set rollback)", "error", err.Error(), "task_id", task.Task.ID)
-					continue
 				}
 			}
 		}
