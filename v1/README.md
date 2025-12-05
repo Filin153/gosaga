@@ -1,17 +1,23 @@
-# github.com/Filin153/gosaga
+# github.com/Filin153/gosaga (v1)
 
 ## EN
-Saga helper with Postgres storage and Kafka transport. `NewSaga` auto-runs the migration from `v1/pg-migration.sql`, builds repos, and starts Kafka reader.
+Saga helper with Postgres storage and Kafka transport. `NewSaga`:
+- runs migration from `v1/pg-migration.sql`
+- wires PG repos
+- starts Kafka reader
+- exposes aliases/helpers so you import everything from `github.com/Filin153/gosaga/v1`.
 
 ### Requirements
 - PostgreSQL tables from `v1/pg-migration.sql`
 - `pgxpool.Pool`
 - Kafka + `sarama.Config`
 
-### Interfaces
+### Interfaces & exports
 - `WorkerInterface`: `New(ctx)`, `Worker(task, sess)`, `DlqWorker(task, sess)`
-- Built-in outbound worker: `v1/out_task.go` (`NewOutWorker(kafka.Writer)`) если нужно только публиковать в Kafka.
-- Task/DLQ repositories: ready-made PG impl (`storage/database/pg`), can be swapped
+- Built-in outbound worker: `NewOutWorker(kafka.Writer)` (publish to Kafka)
+- Aliases in this package: `SagaMsg`, `SagaTask`, `TaskStatus`, `Session`, `TaskRepository`, `DLQRepository`
+- Kafka helpers: `NewKafkaWriter(...)`, `NewKafkaReader(...)`
+- Task/DLQ repositories: PG impl (`storage/database/pg`), swappable
 
 ### Example
 ```go
@@ -22,7 +28,6 @@ import (
     "log"
 
     gosaga "github.com/Filin153/gosaga/v1"
-    "github.com/Filin153/gosaga/storage/broker/kafka"
     "github.com/IBM/sarama"
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -84,17 +89,23 @@ func main() {
 ---
 
 ## RU
-Хелпер для саг с хранением в Postgres и транспортом Kafka. `NewSaga` автоматически запускает миграцию из `v1/pg-migration.sql`, собирает репозитории и стартует Kafka reader.
+Хелпер для саг с хранением в Postgres и транспортом Kafka. `NewSaga`:
+- автоматически запускает миграцию `v1/pg-migration.sql`
+- поднимает PG-репозитории
+- стартует Kafka reader
+- экспортирует алиасы/хелперы, чтобы импортировать всё из `github.com/Filin153/gosaga/v1`.
 
 ### Требования
 - PostgreSQL с таблицами из `v1/pg-migration.sql`
 - `pgxpool.Pool`
 - Kafka + `sarama.Config`
 
-### Интерфейсы
+### Интерфейсы и экспорты
 - `WorkerInterface`: `New(ctx)`, `Worker(task, sess)`, `DlqWorker(task, sess)`
-- Готовый воркер для исходящих задач: `v1/out_task.go` (`NewOutWorker(kafka.Writer)`), если нужно просто публиковать в Kafka.
-- Репозитории задач/DLQ: готовая PG-реализация (`storage/database/pg`), можно подменять
+- Готовый воркер для исходящих задач: `NewOutWorker(kafka.Writer)` (публикация в Kafka)
+- Алиасы: `SagaMsg`, `SagaTask`, `TaskStatus`, `Session`, `TaskRepository`, `DLQRepository`
+- Kafka-хелперы: `NewKafkaWriter(...)`, `NewKafkaReader(...)`
+- Репозитории задач/DLQ: PG-реализация (`storage/database/pg`), можно подменять
 
 ### Пример
 ```go
