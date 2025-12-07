@@ -32,7 +32,7 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 					continue
 				}
 
-				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusWait)
+				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusWait, 10)
 				if err != nil {
 					slog.Error("dataBaseTaskReader: GetByStatus error", "error", err.Error())
 					if err := tx.Rollback(ctx); err != nil {
@@ -95,7 +95,7 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 					continue
 				}
 
-				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusError)
+				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusError, 10)
 				if err != nil {
 					slog.Error("dataBaseDLQTaskReader: GetByStatus error", "error", err.Error())
 					if err := tx.Rollback(ctx); err != nil {

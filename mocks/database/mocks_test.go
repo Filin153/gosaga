@@ -301,8 +301,8 @@ func (_c *MockTaskRepository_GetByIdempotencyKey_Call) RunAndReturn(run func(ctx
 }
 
 // GetByStatus provides a mock function for the type MockTaskRepository
-func (_mock *MockTaskRepository) GetByStatus(ctx context.Context, status domain.TaskStatus) ([]domain.SagaTask, error) {
-	ret := _mock.Called(ctx, status)
+func (_mock *MockTaskRepository) GetByStatus(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.SagaTask, error) {
+	ret := _mock.Called(ctx, status, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetByStatus")
@@ -310,18 +310,18 @@ func (_mock *MockTaskRepository) GetByStatus(ctx context.Context, status domain.
 
 	var r0 []domain.SagaTask
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus) ([]domain.SagaTask, error)); ok {
-		return returnFunc(ctx, status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus, int) ([]domain.SagaTask, error)); ok {
+		return returnFunc(ctx, status, limit)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus) []domain.SagaTask); ok {
-		r0 = returnFunc(ctx, status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus, int) []domain.SagaTask); ok {
+		r0 = returnFunc(ctx, status, limit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]domain.SagaTask)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.TaskStatus) error); ok {
-		r1 = returnFunc(ctx, status)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.TaskStatus, int) error); ok {
+		r1 = returnFunc(ctx, status, limit)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -336,11 +336,12 @@ type MockTaskRepository_GetByStatus_Call struct {
 // GetByStatus is a helper method to define mock.On call
 //   - ctx context.Context
 //   - status domain.TaskStatus
-func (_e *MockTaskRepository_Expecter) GetByStatus(ctx interface{}, status interface{}) *MockTaskRepository_GetByStatus_Call {
-	return &MockTaskRepository_GetByStatus_Call{Call: _e.mock.On("GetByStatus", ctx, status)}
+//   - limit int
+func (_e *MockTaskRepository_Expecter) GetByStatus(ctx interface{}, status interface{}, limit interface{}) *MockTaskRepository_GetByStatus_Call {
+	return &MockTaskRepository_GetByStatus_Call{Call: _e.mock.On("GetByStatus", ctx, status, limit)}
 }
 
-func (_c *MockTaskRepository_GetByStatus_Call) Run(run func(ctx context.Context, status domain.TaskStatus)) *MockTaskRepository_GetByStatus_Call {
+func (_c *MockTaskRepository_GetByStatus_Call) Run(run func(ctx context.Context, status domain.TaskStatus, limit int)) *MockTaskRepository_GetByStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -350,9 +351,14 @@ func (_c *MockTaskRepository_GetByStatus_Call) Run(run func(ctx context.Context,
 		if args[1] != nil {
 			arg1 = args[1].(domain.TaskStatus)
 		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -363,7 +369,7 @@ func (_c *MockTaskRepository_GetByStatus_Call) Return(sagaTasks []domain.SagaTas
 	return _c
 }
 
-func (_c *MockTaskRepository_GetByStatus_Call) RunAndReturn(run func(ctx context.Context, status domain.TaskStatus) ([]domain.SagaTask, error)) *MockTaskRepository_GetByStatus_Call {
+func (_c *MockTaskRepository_GetByStatus_Call) RunAndReturn(run func(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.SagaTask, error)) *MockTaskRepository_GetByStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -760,8 +766,8 @@ func (_c *MockDLQRepository_GetByID_Call) RunAndReturn(run func(ctx context.Cont
 }
 
 // GetByStatus provides a mock function for the type MockDLQRepository
-func (_mock *MockDLQRepository) GetByStatus(ctx context.Context, status domain.TaskStatus) ([]domain.DLQEntry, error) {
-	ret := _mock.Called(ctx, status)
+func (_mock *MockDLQRepository) GetByStatus(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.DLQEntry, error) {
+	ret := _mock.Called(ctx, status, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetByStatus")
@@ -769,18 +775,18 @@ func (_mock *MockDLQRepository) GetByStatus(ctx context.Context, status domain.T
 
 	var r0 []domain.DLQEntry
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus) ([]domain.DLQEntry, error)); ok {
-		return returnFunc(ctx, status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus, int) ([]domain.DLQEntry, error)); ok {
+		return returnFunc(ctx, status, limit)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus) []domain.DLQEntry); ok {
-		r0 = returnFunc(ctx, status)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, domain.TaskStatus, int) []domain.DLQEntry); ok {
+		r0 = returnFunc(ctx, status, limit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]domain.DLQEntry)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.TaskStatus) error); ok {
-		r1 = returnFunc(ctx, status)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, domain.TaskStatus, int) error); ok {
+		r1 = returnFunc(ctx, status, limit)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -795,11 +801,12 @@ type MockDLQRepository_GetByStatus_Call struct {
 // GetByStatus is a helper method to define mock.On call
 //   - ctx context.Context
 //   - status domain.TaskStatus
-func (_e *MockDLQRepository_Expecter) GetByStatus(ctx interface{}, status interface{}) *MockDLQRepository_GetByStatus_Call {
-	return &MockDLQRepository_GetByStatus_Call{Call: _e.mock.On("GetByStatus", ctx, status)}
+//   - limit int
+func (_e *MockDLQRepository_Expecter) GetByStatus(ctx interface{}, status interface{}, limit interface{}) *MockDLQRepository_GetByStatus_Call {
+	return &MockDLQRepository_GetByStatus_Call{Call: _e.mock.On("GetByStatus", ctx, status, limit)}
 }
 
-func (_c *MockDLQRepository_GetByStatus_Call) Run(run func(ctx context.Context, status domain.TaskStatus)) *MockDLQRepository_GetByStatus_Call {
+func (_c *MockDLQRepository_GetByStatus_Call) Run(run func(ctx context.Context, status domain.TaskStatus, limit int)) *MockDLQRepository_GetByStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -809,9 +816,14 @@ func (_c *MockDLQRepository_GetByStatus_Call) Run(run func(ctx context.Context, 
 		if args[1] != nil {
 			arg1 = args[1].(domain.TaskStatus)
 		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -822,7 +834,7 @@ func (_c *MockDLQRepository_GetByStatus_Call) Return(dLQEntrys []domain.DLQEntry
 	return _c
 }
 
-func (_c *MockDLQRepository_GetByStatus_Call) RunAndReturn(run func(ctx context.Context, status domain.TaskStatus) ([]domain.DLQEntry, error)) *MockDLQRepository_GetByStatus_Call {
+func (_c *MockDLQRepository_GetByStatus_Call) RunAndReturn(run func(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.DLQEntry, error)) *MockDLQRepository_GetByStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

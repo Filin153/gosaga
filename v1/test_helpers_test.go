@@ -133,7 +133,7 @@ func (s *stubTaskRepo) GetByIdempotencyKey(context.Context, string) (*domain.Sag
 	return s.getByKeyResp, nil
 }
 
-func (s *stubTaskRepo) GetByStatus(context.Context, domain.TaskStatus) ([]domain.SagaTask, error) {
+func (s *stubTaskRepo) GetByStatus(context.Context, domain.TaskStatus, int) ([]domain.SagaTask, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.getByStatusErrs) > 0 {
@@ -206,7 +206,7 @@ func (s *stubDLQRepo) GetByTaskID(_ context.Context, taskID int64) (*domain.DLQT
 	return s.existing[taskID], nil
 }
 
-func (s *stubDLQRepo) GetByStatus(context.Context, domain.TaskStatus) ([]domain.DLQEntry, error) {
+func (s *stubDLQRepo) GetByStatus(context.Context, domain.TaskStatus, int) ([]domain.DLQEntry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.getByStatusErrs) > 0 {

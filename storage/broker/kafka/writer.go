@@ -15,6 +15,8 @@ type KafkaWriter struct {
 }
 
 func NewKafkaWriter(hosts []string, conf *sarama.Config) (*KafkaWriter, error) {
+	conf.Producer.Return.Successes = true
+
 	p, err := sarama.NewSyncProducer(hosts, conf)
 	if err != nil {
 		slog.Error("KafkaWriter.New: NewSyncProducer error", "error", err.Error())
@@ -28,7 +30,7 @@ func NewKafkaWriter(hosts []string, conf *sarama.Config) (*KafkaWriter, error) {
 }
 
 func (k *KafkaWriter) Write(ctx context.Context, msg *domain.SagaMsg, rollback *domain.SagaMsg, idempotencyKey string) error {
-	slog.Info("KafkaWriter.Write: start", "topic", msg.Topic, "key", msg.Key)
+	slog.Debug("KafkaWriter.Write: start", "topic", msg.Topic, "key", msg.Key)
 	payload, err := json.Marshal(msg.Value)
 	if err != nil {
 		slog.Error("KafkaWriter.Write: marshal payload error", "error", err.Error())
@@ -75,6 +77,6 @@ func (k *KafkaWriter) Write(ctx context.Context, msg *domain.SagaMsg, rollback *
 		}
 	}
 
-	slog.Info("KafkaWriter.Write: success", "topic", msg.Topic, "key", msg.Key)
+	slog.Debug("KafkaWriter.Write: success", "topic", msg.Topic, "key", msg.Key)
 	return nil
 }
