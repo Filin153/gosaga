@@ -15,6 +15,8 @@ type KafkaWriter struct {
 }
 
 func NewKafkaWriter(hosts []string, conf *sarama.Config) (*KafkaWriter, error) {
+	conf.Producer.Return.Successes = true
+
 	p, err := sarama.NewSyncProducer(hosts, conf)
 	if err != nil {
 		slog.Error("KafkaWriter.New: NewSyncProducer error", "error", err.Error())
