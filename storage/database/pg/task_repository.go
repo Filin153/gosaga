@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/Filin153/gosaga/domain"
 	"github.com/Filin153/gosaga/storage/database"
@@ -164,6 +165,62 @@ func (r *taskPgRepository) UpdateByID(ctx context.Context, id int64, update doma
 }
 
 func (r *taskPgRepository) GetByStatus(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.SagaTask, error) {
+	// When pulling tasks in "wait" we reserve them first to avoid double processing.
+	// Reserved tasks that have not moved forward within reservationTTL are retried.
+	if status == domain.TaskStatusWait {
+		const reservationTTL = 120 * time.Second
+		query := fmt.Sprintf(`
+			WITH candidates AS (
+				SELECT "id"
+				FROM "%s"
+				WHERE ("status" = $1 OR ("status" = $2 AND "updated_at" <= timezone('UTC', now()) - ($3 * interval '1 second')))
+				ORDER BY "updated_at"
+				FOR UPDATE SKIP LOCKED
+				LIMIT $4
+			)
+			UPDATE "%s" AS t
+			SET "status" = $2
+			FROM candidates
+			WHERE t."id" = candidates."id"
+			RETURNING t."id", t."idempotency_key", t."data", t."rollback_data", t."status", t."info", t."updated_at";
+		`, r.table, r.table)
+
+		rows, err := r.db.Query(ctx, query, domain.TaskStatusWait, domain.TaskStatusReserved, int(reservationTTL.Seconds()), limit)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		result, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.SagaTask, error) {
+			var (
+				task     domain.SagaTask
+				info     sql.NullString
+				rollback sql.NullString
+			)
+			if err := row.Scan(
+				&task.ID,
+				&task.IdempotencyKey,
+				&task.Data,
+				&rollback,
+				&task.Status,
+				&info,
+				&task.UpdatedAt,
+			); err != nil {
+				return domain.SagaTask{}, err
+			}
+			if info.Valid {
+				task.Info = &info.String
+			}
+			if rollback.Valid {
+				raw := json.RawMessage(rollback.String)
+				task.RollbackData = &raw
+			}
+			return task, nil
+		})
+
+		return result, err
+	}
+
 	query := fmt.Sprintf(`
 		SELECT "id", "idempotency_key", "data", "rollback_data", "status", "info", "updated_at"
 		FROM "%s"

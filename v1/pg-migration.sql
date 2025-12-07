@@ -5,7 +5,7 @@ BEGIN
         FROM pg_type 
         WHERE typname = 'go_saga_task_enum'
     ) THEN 
-        CREATE TYPE "go_saga_task_enum" AS ENUM ('wait', 'work', 'ready', 'error', 'rollback', 'error_rollback_none');
+        CREATE TYPE "go_saga_task_enum" AS ENUM ('wait', 'reserved', 'work', 'ready', 'error', 'rollback', 'error_rollback_none');
     END IF; 
 END $$;
 

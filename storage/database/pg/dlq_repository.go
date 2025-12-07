@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/Filin153/gosaga/domain"
 	"github.com/Filin153/gosaga/storage/database"
@@ -172,6 +173,93 @@ func (r *dlqPgRepository) UpdateByID(ctx context.Context, id int64, update domai
 
 func (r *dlqPgRepository) GetByStatus(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.DLQEntry, error) {
 	slog.Debug("dlqPgRepository.GetByStatus: start", "dlq_table", r.dlqTable, "status", status)
+
+	// Reserve error tasks to avoid duplicate processing; recycle stale reservations.
+	if status == domain.TaskStatusError {
+		const reservationTTL = 60 * time.Second
+		query := fmt.Sprintf(`
+			WITH candidates AS (
+				SELECT d."id" AS dlq_id, d."task_id"
+				FROM "%s" AS d
+				JOIN "%s" AS t ON d."task_id" = t."id"
+				WHERE (t."status" = $1 OR (t."status" = $2 AND t."updated_at" <= timezone('UTC', now()) - ($3 * interval '1 second')))
+				  AND d."updated_at" + (d."time_for_next_try" * interval '1 second') <= timezone('UTC', now())
+				  AND d."have_attempts" < d."max_attempts"
+				ORDER BY d."updated_at"
+				FOR UPDATE SKIP LOCKED
+				LIMIT $4
+			),
+			updated_tasks AS (
+				UPDATE "%s" AS t
+				SET "status" = $2
+				FROM candidates c
+				WHERE t."id" = c."task_id"
+				RETURNING t."id", t."idempotency_key", t."data", t."rollback_data", t."status", t."info", t."updated_at"
+			),
+			bumped_dlq AS (
+				UPDATE "%s" AS d
+				SET "have_attempts" = d."have_attempts"
+				FROM candidates c
+				WHERE d."id" = c."dlq_id"
+				RETURNING d."id", d."task_id", d."time_for_next_try", d."time_mul", d."max_attempts", d."have_attempts", d."updated_at"
+			)
+			SELECT 
+				t."id", t."idempotency_key", t."data", t."rollback_data", t."status", t."info", t."updated_at",
+				d."id", d."task_id", d."time_for_next_try", d."time_mul", d."max_attempts", d."have_attempts", d."updated_at"
+			FROM updated_tasks t
+			JOIN bumped_dlq d ON t."id" = d."task_id";
+		`, r.dlqTable, r.taskTable, r.taskTable, r.dlqTable)
+
+		rows, err := r.db.Query(ctx, query, domain.TaskStatusError, domain.TaskStatusReserved, int(reservationTTL.Seconds()), limit)
+		if err != nil {
+			slog.Error("dlqPgRepository.GetByStatus: query error", "error", err.Error(), "dlq_table", r.dlqTable, "status", status)
+			return nil, err
+		}
+		defer rows.Close()
+
+		entries, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.DLQEntry, error) {
+			var (
+				entry    domain.DLQEntry
+				info     sql.NullString
+				rollback sql.NullString
+			)
+			if err := row.Scan(
+				&entry.Task.ID,
+				&entry.Task.IdempotencyKey,
+				&entry.Task.Data,
+				&rollback,
+				&entry.Task.Status,
+				&info,
+				&entry.Task.UpdatedAt,
+				&entry.DLQ.ID,
+				&entry.DLQ.TaskID,
+				&entry.DLQ.TimeForNextTry,
+				&entry.DLQ.TimeMul,
+				&entry.DLQ.MaxAttempts,
+				&entry.DLQ.HaveAttempts,
+				&entry.DLQ.UpdatedAt,
+			); err != nil {
+				return domain.DLQEntry{}, err
+			}
+			if info.Valid {
+				entry.Task.Info = &info.String
+			}
+			if rollback.Valid {
+				raw := json.RawMessage(rollback.String)
+				entry.Task.RollbackData = &raw
+			}
+			return entry, nil
+		})
+
+		if err != nil {
+			slog.Error("dlqPgRepository.GetByStatus: scan error", "error", err.Error(), "dlq_table", r.dlqTable, "status", status)
+			return nil, err
+		}
+
+		slog.Debug("dlqPgRepository.GetByStatus: success", "dlq_table", r.dlqTable, "status", status, "count", len(entries))
+		return entries, nil
+	}
+
 	query := fmt.Sprintf(`
 		WITH updated AS (
 			UPDATE "%s" AS d

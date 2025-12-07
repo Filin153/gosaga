@@ -8,11 +8,12 @@ import (
 type TaskStatus string
 
 const (
-	TaskStatusWait     TaskStatus = "wait"
-	TaskStatusWork     TaskStatus = "work"
-	TaskStatusReady    TaskStatus = "ready"
-	TaskStatusError    TaskStatus = "error"
-	TaskStatusRollback TaskStatus = "rollback"
+	TaskStatusWait              TaskStatus = "wait"
+	TaskStatusReserved          TaskStatus = "reserved"
+	TaskStatusWork              TaskStatus = "work"
+	TaskStatusReady             TaskStatus = "ready"
+	TaskStatusError             TaskStatus = "error"
+	TaskStatusRollback          TaskStatus = "rollback"
 	TaskStatusErrorRollbackNone TaskStatus = "error_rollback_none"
 )
 
