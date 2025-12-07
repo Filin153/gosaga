@@ -11,7 +11,7 @@ type TaskRepository interface {
 	Create(ctx context.Context, task *domain.SagaTask) (int64, error)
 	GetByID(ctx context.Context, id int64) (*domain.SagaTask, error)
 	GetByIdempotencyKey(ctx context.Context, key string) (*domain.SagaTask, error)
-	GetByStatus(ctx context.Context, status domain.TaskStatus) ([]domain.SagaTask, error)
+	GetByStatus(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.SagaTask, error)
 	Update(ctx context.Context, task *domain.SagaTask) error
 	UpdateByID(ctx context.Context, id int64, update domain.SagaTaskUpdate) error
 	Delete(ctx context.Context, id int64) error
@@ -22,7 +22,7 @@ type DLQRepository interface {
 	Create(ctx context.Context, task *domain.DLQTask) (int64, error)
 	GetByID(ctx context.Context, id int64) (*domain.DLQTask, error)
 	GetByTaskID(ctx context.Context, taskID int64) (*domain.DLQTask, error)
-	GetByStatus(ctx context.Context, status domain.TaskStatus) ([]domain.DLQEntry, error)
+	GetByStatus(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.DLQEntry, error)
 	GetErrorsWithAttempts(ctx context.Context) ([]domain.DLQEntry, error)
 	Update(ctx context.Context, task *domain.DLQTask) error
 	UpdateByID(ctx context.Context, id int64, update domain.DLQTaskUpdate) error

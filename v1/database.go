@@ -32,7 +32,7 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 					continue
 				}
 
-				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusWait)
+				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusWait, 10)
 				if err != nil {
 					slog.Error("dataBaseTaskReader: GetByStatus error", "error", err.Error())
 					if err := tx.Rollback(ctx); err != nil {
@@ -59,7 +59,7 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 					case taskMsg <- &item:
 						continue
 					case <-ctx.Done():
-						slog.Debug("dataBaseTaskReader: context canceled while sending tasks")
+						slog.Info("dataBaseTaskReader: context canceled while sending tasks")
 						if err := tx.Rollback(ctx); err != nil {
 							slog.Error("dataBaseTaskReader: context canceled while sending tasks, rollback", "error", err.Error())
 						}
@@ -95,7 +95,7 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 					continue
 				}
 
-				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusError)
+				data, err := repo.WithSession(tx).GetByStatus(ctx, domain.TaskStatusError, 10)
 				if err != nil {
 					slog.Error("dataBaseDLQTaskReader: GetByStatus error", "error", err.Error())
 					if err := tx.Rollback(ctx); err != nil {
@@ -122,7 +122,7 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 					case taskMsg <- &item.Task:
 						continue
 					case <-ctx.Done():
-						slog.Debug("dataBaseDLQTaskReader: context canceled while sending tasks")
+						slog.Info("dataBaseDLQTaskReader: context canceled while sending tasks")
 						if err := tx.Rollback(ctx); err != nil {
 							slog.Error("dataBaseDLQTaskReader: context canceled while sending tasks, rollback", "error", err.Error())
 						}

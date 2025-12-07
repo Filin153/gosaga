@@ -170,7 +170,7 @@ func (r *dlqPgRepository) UpdateByID(ctx context.Context, id int64, update domai
 	return nil
 }
 
-func (r *dlqPgRepository) GetByStatus(ctx context.Context, status domain.TaskStatus) ([]domain.DLQEntry, error) {
+func (r *dlqPgRepository) GetByStatus(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.DLQEntry, error) {
 	slog.Debug("dlqPgRepository.GetByStatus: start", "dlq_table", r.dlqTable, "status", status)
 	query := fmt.Sprintf(`
 		WITH updated AS (
@@ -184,10 +184,12 @@ func (r *dlqPgRepository) GetByStatus(ctx context.Context, status domain.TaskSta
 			RETURNING d."id", d."task_id", d."time_for_next_try", d."time_mul", d."max_attempts", d."have_attempts", d."updated_at",
 					  t."id" AS task_id, t."idempotency_key", t."data", t."rollback_data", t."status", t."info", t."updated_at" AS task_updated_at
 		)
-		SELECT * FROM updated;
+		SELECT * FROM updated
+		FOR UPDATE SKIP LOCKED
+		LIMIT $2;
 	`, r.dlqTable, r.taskTable)
 
-	rows, err := r.db.Query(ctx, query, status)
+	rows, err := r.db.Query(ctx, query, status, limit)
 	if err != nil {
 		slog.Error("dlqPgRepository.GetByStatus: query error", "error", err.Error(), "dlq_table", r.dlqTable, "status", status)
 		return nil, err

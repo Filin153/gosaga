@@ -163,14 +163,16 @@ func (r *taskPgRepository) UpdateByID(ctx context.Context, id int64, update doma
 	return err
 }
 
-func (r *taskPgRepository) GetByStatus(ctx context.Context, status domain.TaskStatus) ([]domain.SagaTask, error) {
+func (r *taskPgRepository) GetByStatus(ctx context.Context, status domain.TaskStatus, limit int) ([]domain.SagaTask, error) {
 	query := fmt.Sprintf(`
 		SELECT "id", "idempotency_key", "data", "rollback_data", "status", "info", "updated_at"
 		FROM "%s"
-		WHERE "status" = $1;
+		WHERE "status" = $1
+		FOR UPDATE SKIP LOCKED
+		LIMIT $2;
 	`, r.table)
 
-	rows, err := r.db.Query(ctx, query, status)
+	rows, err := r.db.Query(ctx, query, status, limit)
 	if err != nil {
 		return nil, err
 	}
