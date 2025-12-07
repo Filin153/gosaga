@@ -176,7 +176,7 @@ func (r *dlqPgRepository) GetByStatus(ctx context.Context, status domain.TaskSta
 
 	// Reserve error tasks to avoid duplicate processing; recycle stale reservations.
 	if status == domain.TaskStatusError {
-		const reservationTTL = 60 * time.Second
+		const reservationTTL = 120 * time.Second
 		query := fmt.Sprintf(`
 			WITH candidates AS (
 				SELECT d."id" AS dlq_id, d."task_id"
