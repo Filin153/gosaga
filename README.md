@@ -11,7 +11,7 @@ Saga helper with Postgres storage and Kafka transport. `NewSaga`:
 - PostgreSQL tables from `v1/pg-migration.sql`
 - `pgxpool.Pool`
 - Kafka + `sarama.Config`
-- Migration creates PK columns without auto-increment; configure sequences/defaults or provide IDs yourself if you change schema.
+- Migration creates PK columns with identity; if you change schema, keep defaults/sequences.
 
 ### Interfaces & exports
 - `WorkerInterface`:
@@ -30,6 +30,9 @@ package main
 import (
     "context"
     "log"
+    "os"
+    "os/signal"
+    "syscall"
 
     gosaga "github.com/Filin153/gosaga/v1"
     "github.com/IBM/sarama"
@@ -54,7 +57,8 @@ type demoOutWorker struct{ *gosaga.OutWorker }
 func (w *demoOutWorker) New(ctx context.Context) (gosaga.WorkerInterface, error) { return w, nil }
 
 func main() {
-    ctx := context.Background()
+    ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
 
     pool, err := pgxpool.New(ctx, "postgres://user:pass@host/db")
     if err != nil {
@@ -79,6 +83,12 @@ func main() {
 
     // write outgoing task to out-topic
     _ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "out-topic"}, nil, func() {})
+
+    // block until signal
+    <-ctx.Done()
+    _ = saga.kafkaReader.Shutdown()
+    _ = pool.Close()
+    stop()
 }
 ```
 
@@ -129,6 +139,9 @@ package main
 import (
     "context"
     "log"
+    "os"
+    "os/signal"
+    "syscall"
 
     gosaga "github.com/Filin153/gosaga/v1"
     "github.com/IBM/sarama"
@@ -153,7 +166,8 @@ type demoOutWorker struct{ *gosaga.OutWorker }
 func (w *demoOutWorker) New(ctx context.Context) (gosaga.WorkerInterface, error) { return w, nil }
 
 func main() {
-    ctx := context.Background()
+    ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
 
     pool, err := pgxpool.New(ctx, "postgres://user:pass@host/db")
     if err != nil {
@@ -178,6 +192,12 @@ func main() {
 
     // запись исходящей задачи в out-topic
     _ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "out-topic"}, nil, func() {})
+
+    // держим процесс, пока не придёт SIGINT/SIGTERM
+    <-ctx.Done()
+    _ = saga.kafkaReader.Shutdown()
+    _ = pool.Close()
+    stop()
 }
 ```
 

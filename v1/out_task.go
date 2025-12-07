@@ -19,10 +19,6 @@ func NewOutWorker(kafkaWriter kafka.Writer) *OutWorker {
 	}
 }
 
-func New(ctx context.Context) (*OutWorker, error) {
-	return &OutWorker{}, nil
-}
-
 func (w *OutWorker) Worker(ctx context.Context, task *domain.SagaTask, sess database.Session) error {
 	msgData, err := Unmarshal(task)
 	if err != nil {

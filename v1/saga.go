@@ -75,24 +75,12 @@ func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, reader
 
 // RunWorkers spins up workers for in/out tasks and their DLQ counterparts.
 // limiter caps concurrency per stream; total goroutines up to limiter*4.
-func (s *Saga) RunWorkers(ctx context.Context, limiter int, outWorker WorkerInterface, inWorker WorkerInterface) error {
+func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerInterface, newInWorker WorkerInterface) error {
 	slog.Info("Saga.RunWorkers: start", "limiter", limiter)
 	OutTaskWorkerCountLimiter := make(chan struct{}, limiter)
 	dlqOutTaskWorkerCountLimiter := make(chan struct{}, limiter)
 	InTaskWorkerCountLimiter := make(chan struct{}, limiter)
 	dlqInTaskWorkerCountLimiter := make(chan struct{}, limiter)
-
-	newOutWorker, err := outWorker.New(ctx)
-	if err != nil {
-		slog.Error("Saga.RunWorkers: outWorker.New error", "error", err.Error())
-		return err
-	}
-
-	newInWorker, err := inWorker.New(ctx)
-	if err != nil {
-		slog.Error("Saga.RunWorkers: inWorker.New error", "error", err.Error())
-		return err
-	}
 
 	// Create task in database
 	go func() {
