@@ -84,7 +84,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 
 	// Create task in database
 	go func() {
-		slog.Info("Saga.RunWorkers: start Kafka->DB ingestion loop")
+		slog.Debug("Saga.RunWorkers: start Kafka->DB ingestion loop")
 		for msg := range s.kafkaReader.Read() {
 			var msgIdempotencyKey string
 			var rollbackData json.RawMessage
@@ -113,7 +113,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 
 			task, err := s.inTaskRepo.GetByIdempotencyKey(ctx, msgIdempotencyKey)
 			if task != nil {
-				slog.Info("Saga.RunWorkers: skip duplicated message by idempotency_key", "idempotency_key", msgIdempotencyKey)
+				slog.Debug("Saga.RunWorkers: skip duplicated message by idempotency_key", "idempotency_key", msgIdempotencyKey)
 				continue
 			} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				slog.Error("Saga.RunWorkers: inTaskRepo.GetByIdempotencyKey", "error", err.Error(), "idempotency_key", msgIdempotencyKey)
@@ -136,7 +136,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 
 	// RollBack
 	go func() {
-		slog.Info("Saga.RunWorkers: start rollback loop")
+		slog.Debug("Saga.RunWorkers: start rollback loop")
 		for {
 			sleep(10 * time.Second)
 
@@ -191,7 +191,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 
 	// InTask
 	go func() {
-		slog.Info("Saga.RunWorkers: start InTask loop")
+		slog.Debug("Saga.RunWorkers: start InTask loop")
 		inTasksMsgChan := s.dataBaseTaskReader(ctx, s.inTaskRepo)
 		for task := range inTasksMsgChan {
 			select {
@@ -208,7 +208,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 
 	// DlqInTask
 	go func() {
-		slog.Info("Saga.RunWorkers: start DlqInTask loop")
+		slog.Debug("Saga.RunWorkers: start DlqInTask loop")
 		dlqInTasksMsgChan := s.dataBaseDLQTaskReader(ctx, s.dlqInTaskRepo)
 		for task := range dlqInTasksMsgChan {
 			select {
@@ -225,7 +225,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 
 	// OutTask
 	go func() {
-		slog.Info("Saga.RunWorkers: start OutTask loop")
+		slog.Debug("Saga.RunWorkers: start OutTask loop")
 		outTasksMsgChan := s.dataBaseTaskReader(ctx, s.outTaskRepo)
 		for task := range outTasksMsgChan {
 			select {
@@ -242,7 +242,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 
 	// DlqOutTask
 	go func() {
-		slog.Info("Saga.RunWorkers: start DlqOutTask loop")
+		slog.Debug("Saga.RunWorkers: start DlqOutTask loop")
 		dlqOutTasksMsgChan := s.dataBaseDLQTaskReader(ctx, s.dlqOutTaskRepo)
 		for task := range dlqOutTasksMsgChan {
 			select {
@@ -302,7 +302,7 @@ func (s *Saga) Write(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *doma
 		return err
 	}
 
-	slog.Info("Saga.Write: success")
+	slog.Debug("Saga.Write: success")
 	return nil
 }
 

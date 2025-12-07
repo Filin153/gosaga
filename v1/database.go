@@ -59,7 +59,7 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 					case taskMsg <- &item:
 						continue
 					case <-ctx.Done():
-						slog.Info("dataBaseTaskReader: context canceled while sending tasks")
+						slog.Debug("dataBaseTaskReader: context canceled while sending tasks")
 						if err := tx.Rollback(ctx); err != nil {
 							slog.Error("dataBaseTaskReader: context canceled while sending tasks, rollback", "error", err.Error())
 						}
@@ -122,7 +122,7 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 					case taskMsg <- &item.Task:
 						continue
 					case <-ctx.Done():
-						slog.Info("dataBaseDLQTaskReader: context canceled while sending tasks")
+						slog.Debug("dataBaseDLQTaskReader: context canceled while sending tasks")
 						if err := tx.Rollback(ctx); err != nil {
 							slog.Error("dataBaseDLQTaskReader: context canceled while sending tasks, rollback", "error", err.Error())
 						}
