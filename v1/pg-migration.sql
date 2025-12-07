@@ -20,10 +20,10 @@ CREATE TABLE IF NOT EXISTS "go_saga_in_task" (
     UNIQUE ("idempotency_key")
 );
 
-CREATE INDEX "go_saga_in_task_idempotency_key_index" 
+CREATE INDEX IF NOT EXISTS "go_saga_in_task_idempotency_key_index" 
 ON "go_saga_in_task" USING HASH ("idempotency_key");
 
-CREATE INDEX "go_saga_in_task_status_index" 
+CREATE INDEX IF NOT EXISTS "go_saga_in_task_status_index" 
 ON "go_saga_in_task" USING HASH ("status");
 
 CREATE TABLE IF NOT EXISTS "go_saga_out_task" (
@@ -37,10 +37,10 @@ CREATE TABLE IF NOT EXISTS "go_saga_out_task" (
     UNIQUE ("idempotency_key")
 );
 
-CREATE INDEX "go_saga_out_task_idempotency_key_index" 
+CREATE INDEX IF NOT EXISTS "go_saga_out_task_idempotency_key_index" 
 ON "go_saga_out_task" USING HASH ("idempotency_key");
 
-CREATE INDEX "go_saga_out_task_status_index" 
+CREATE INDEX IF NOT EXISTS "go_saga_out_task_status_index" 
 ON "go_saga_out_task" USING HASH ("status");
 
 CREATE TABLE IF NOT EXISTS "go_saga_dlq_in_task" (
@@ -86,32 +86,42 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER go_saga_update_dlq_out_task_updated_at
-BEFORE UPDATE ON "go_saga_dlq_out_task"
-FOR EACH ROW
-EXECUTE FUNCTION go_saga_update_task_timestamp();
-
-CREATE TRIGGER go_saga_dlq_out_task_attempt
-BEFORE UPDATE ON "go_saga_dlq_out_task"
-FOR EACH ROW
-EXECUTE FUNCTION go_saga_increment_dlq_attempts();
-
-CREATE TRIGGER go_saga_update_dlq_in_task_updated_at
-BEFORE UPDATE ON "go_saga_dlq_in_task"
-FOR EACH ROW
-EXECUTE FUNCTION go_saga_update_task_timestamp();
-
-CREATE TRIGGER go_saga_dlq_in_task_attempt
-BEFORE UPDATE ON "go_saga_dlq_in_task"
-FOR EACH ROW
-EXECUTE FUNCTION go_saga_increment_dlq_attempts();
-
-CREATE TRIGGER go_saga_update_out_task_updated_at
-BEFORE UPDATE ON "go_saga_out_task"
-FOR EACH ROW
-EXECUTE FUNCTION go_saga_update_task_timestamp();
-
-CREATE TRIGGER go_saga_update_in_task_updated_at
-BEFORE UPDATE ON "go_saga_in_task"
-FOR EACH ROW
-EXECUTE FUNCTION go_saga_update_task_timestamp();
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'go_saga_update_dlq_out_task_updated_at') THEN
+        CREATE TRIGGER go_saga_update_dlq_out_task_updated_at
+        BEFORE UPDATE ON "go_saga_dlq_out_task"
+        FOR EACH ROW
+        EXECUTE FUNCTION go_saga_update_task_timestamp();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'go_saga_dlq_out_task_attempt') THEN
+        CREATE TRIGGER go_saga_dlq_out_task_attempt
+        BEFORE UPDATE ON "go_saga_dlq_out_task"
+        FOR EACH ROW
+        EXECUTE FUNCTION go_saga_increment_dlq_attempts();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'go_saga_update_dlq_in_task_updated_at') THEN
+        CREATE TRIGGER go_saga_update_dlq_in_task_updated_at
+        BEFORE UPDATE ON "go_saga_dlq_in_task"
+        FOR EACH ROW
+        EXECUTE FUNCTION go_saga_update_task_timestamp();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'go_saga_dlq_in_task_attempt') THEN
+        CREATE TRIGGER go_saga_dlq_in_task_attempt
+        BEFORE UPDATE ON "go_saga_dlq_in_task"
+        FOR EACH ROW
+        EXECUTE FUNCTION go_saga_increment_dlq_attempts();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'go_saga_update_out_task_updated_at') THEN
+        CREATE TRIGGER go_saga_update_out_task_updated_at
+        BEFORE UPDATE ON "go_saga_out_task"
+        FOR EACH ROW
+        EXECUTE FUNCTION go_saga_update_task_timestamp();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'go_saga_update_in_task_updated_at') THEN
+        CREATE TRIGGER go_saga_update_in_task_updated_at
+        BEFORE UPDATE ON "go_saga_in_task"
+        FOR EACH ROW
+        EXECUTE FUNCTION go_saga_update_task_timestamp();
+    END IF;
+END $$;
