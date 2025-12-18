@@ -6,6 +6,7 @@ Saga helper with Postgres storage and Kafka transport. `NewSaga`:
 - wires PG repos
 - starts Kafka reader
 - exposes aliases/helpers so you import everything from `github.com/Filin153/gosaga/v1`.
+- accepts `logLevel slog.Leveler` to set slog level for all gosaga logs
 
 ### Requirements
 - PostgreSQL tables from `v1/pg-migration.sql`
@@ -29,6 +30,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os/signal"
 	"syscall"
 
@@ -60,7 +62,7 @@ func main() {
 	kafkaConf := sarama.NewConfig()
 	kafkaConf.Version = sarama.V3_6_0_0
 
-	saga, err := gosaga.NewSaga(ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf)
+	saga, err := gosaga.NewSaga(ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf, slog.LevelDebug)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -112,6 +114,7 @@ Notes:
 - поднимает PG-репозитории
 - стартует Kafka reader
 - экспортирует алиасы/хелперы, чтобы импортировать всё из `github.com/Filin153/gosaga/v1`.
+- принимает `logLevel slog.Leveler`, задающий уровень логов для gosaga
 
 ### Требования
 - PostgreSQL с таблицами из `v1/pg-migration.sql`
@@ -135,6 +138,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os/signal"
 	"syscall"
 
@@ -166,7 +170,7 @@ func main() {
 	kafkaConf := sarama.NewConfig()
 	kafkaConf.Version = sarama.V3_6_0_0
 
-	saga, err := gosaga.NewSaga(ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf)
+	saga, err := gosaga.NewSaga(ctx, pool, "consumer-group", []string{"input-topic"}, []string{"kafka:9092"}, kafkaConf, slog.LevelDebug)
 	if err != nil {
 		log.Fatal(err)
 	}

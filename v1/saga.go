@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/Filin153/gosaga/domain"
@@ -39,7 +40,12 @@ type Saga struct {
 var migrationSQL string
 
 // NewSaga initializes repositories, runs DB migration, and starts Kafka reader.
-func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, readerTopics, hosts []string, conf *sarama.Config) (*Saga, error) {
+// logLevel controls slog verbosity for all logs produced by gosaga.
+func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, readerTopics, hosts []string, conf *sarama.Config, logLevel slog.Leveler) (*Saga, error) {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: logLevel,
+	}))
+	slog.SetDefault(logger)
 	slog.Info("Saga.NewSaga: start")
 
 	if err := runMigration(ctx, pool); err != nil {
