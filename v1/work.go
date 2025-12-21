@@ -33,8 +33,18 @@ func (s *Saga) outWork(ctx context.Context, task *domain.SagaTask, do func(ctx c
 		return err
 	}
 
-	err = do(ctx, task, tx)
+	workTx, err := tx.Begin(ctx)
 	if err != nil {
+		slog.Error("outWork: tx.Begin", "error", err.Error(), "task_id", task.ID)
+		return err
+	}
+
+	err = do(ctx, task, workTx)
+	if err != nil {
+		if rbErr := workTx.Rollback(ctx); rbErr != nil {
+			slog.Error("outWork: workTx.Rollback", "error", rbErr.Error(), "task_id", task.ID)
+		}
+
 		info := err.Error()
 		status := domain.TaskStatusError
 		err = outTaskRepoWithSession.UpdateByID(ctx, task.ID, domain.SagaTaskUpdate{
@@ -65,6 +75,11 @@ func (s *Saga) outWork(ctx context.Context, task *domain.SagaTask, do func(ctx c
 		if err := tx.Commit(ctx); err != nil {
 			slog.Error("outWork: tx.Commit (on error)", "error", err.Error(), "task_id", task.ID)
 		}
+		return err
+	}
+
+	if err := workTx.Commit(ctx); err != nil {
+		slog.Error("outWork: workTx.Commit", "error", err.Error(), "task_id", task.ID)
 		return err
 	}
 
@@ -110,8 +125,18 @@ func (s *Saga) inWork(ctx context.Context, task *domain.SagaTask, do func(ctx co
 		return err
 	}
 
-	err = do(ctx, task, tx)
+	workTx, err := tx.Begin(ctx)
 	if err != nil {
+		slog.Error("inWork: tx.Begin", "error", err.Error(), "task_id", task.ID)
+		return err
+	}
+
+	err = do(ctx, task, workTx)
+	if err != nil {
+		if rbErr := workTx.Rollback(ctx); rbErr != nil {
+			slog.Error("inWork: workTx.Rollback", "error", rbErr.Error(), "task_id", task.ID)
+		}
+
 		info := err.Error()
 		status := domain.TaskStatusError
 		err = inTaskRepoWithSession.UpdateByID(ctx, task.ID, domain.SagaTaskUpdate{
@@ -142,6 +167,11 @@ func (s *Saga) inWork(ctx context.Context, task *domain.SagaTask, do func(ctx co
 		if err := tx.Commit(ctx); err != nil {
 			slog.Error("inWork: tx.Commit (on error)", "error", err.Error(), "task_id", task.ID)
 		}
+		return err
+	}
+
+	if err := workTx.Commit(ctx); err != nil {
+		slog.Error("inWork: workTx.Commit", "error", err.Error(), "task_id", task.ID)
 		return err
 	}
 
