@@ -2,7 +2,6 @@ package gosaga
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
@@ -12,7 +11,8 @@ import (
 )
 
 func TestUnmarshal(t *testing.T) {
-	task := domain.SagaTask{Data: json.RawMessage(`{"Key":"k","Value":{"a":1},"Topic":"t"}`)}
+	data, _ := domain.EncodeSagaMsg(&domain.SagaMsg{Key: "k", Value: []byte(`{"a":1}`), Topic: "t"})
+	task := domain.SagaTask{Data: data}
 	msg, err := Unmarshal(&task)
 	require.NoError(t, err)
 	require.Equal(t, "k", msg.Key)
@@ -20,7 +20,7 @@ func TestUnmarshal(t *testing.T) {
 }
 
 func TestUnmarshalError(t *testing.T) {
-	task := domain.SagaTask{Data: json.RawMessage(`{`)}
+	task := domain.SagaTask{Data: []byte{0x02}}
 	_, err := Unmarshal(&task)
 	require.Error(t, err)
 }

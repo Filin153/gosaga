@@ -1,9 +1,6 @@
 package domain
 
-import (
-	"encoding/json"
-	"time"
-)
+import "time"
 
 type TaskStatus string
 
@@ -19,15 +16,15 @@ const (
 
 type SagaMsg struct {
 	Key   string
-	Value any
+	Value []byte
 	Topic string
 }
 
 type SagaTask struct {
 	ID             int64
 	IdempotencyKey string
-	Data           json.RawMessage
-	RollbackData   *json.RawMessage
+	Data           []byte
+	RollbackData   *[]byte
 	Status         TaskStatus
 	Info           *string
 	UpdatedAt      time.Time
@@ -50,11 +47,11 @@ type DLQEntry struct {
 
 // SagaTaskUpdate allows typed partial updates for saga tasks.
 type SagaTaskUpdate struct {
-	IdempotencyKey *string          `db:"idempotency_key"`
-	Data           *json.RawMessage `db:"data"`
-	RollbackData   *json.RawMessage `db:"rollback_data"`
-	Status         *TaskStatus      `db:"status"`
-	Info           *string          `db:"info"`
+	IdempotencyKey *string     `db:"idempotency_key"`
+	Data           *[]byte     `db:"data"`
+	RollbackData   *[]byte     `db:"rollback_data"`
+	Status         *TaskStatus `db:"status"`
+	Info           *string     `db:"info"`
 }
 
 // DLQTaskUpdate allows typed partial updates for DLQ records.

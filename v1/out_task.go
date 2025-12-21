@@ -2,7 +2,6 @@ package gosaga
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/Filin153/gosaga/domain"
 	"github.com/Filin153/gosaga/storage/broker/kafka"
@@ -27,9 +26,8 @@ func (w *OutWorker) Worker(ctx context.Context, task *domain.SagaTask, sess data
 
 	var rollbackMsg *domain.SagaMsg
 	if task.RollbackData != nil {
-		var r domain.SagaMsg
-		if err := json.Unmarshal(*task.RollbackData, &r); err == nil {
-			rollbackMsg = &r
+		if r, err := domain.DecodeSagaMsg(*task.RollbackData); err == nil {
+			rollbackMsg = r
 		}
 	}
 

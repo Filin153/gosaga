@@ -17,7 +17,7 @@ func TestWriteSuccess(t *testing.T) {
 	s := &Saga{outTaskRepo: repo}
 	rollbackCalled := atomic.Int32{}
 
-	msg := &domain.SagaMsg{Key: "k", Value: map[string]any{"a": 1}, Topic: "topic"}
+	msg := &domain.SagaMsg{Key: "k", Value: []byte(`{"a":1}`), Topic: "topic"}
 	err := s.Write(context.Background(), msg, nil, func() { rollbackCalled.Add(1) })
 	require.NoError(t, err)
 	require.Zero(t, rollbackCalled.Load())
@@ -40,12 +40,12 @@ func TestWriteCreateErrorTriggersRollback(t *testing.T) {
 	require.Equal(t, int32(1), rollbackCalled.Load())
 }
 
-func TestWriteMarshalError(t *testing.T) {
+func TestWriteEncodeError(t *testing.T) {
 	repo := &stubTaskRepo{}
 	s := &Saga{outTaskRepo: repo}
 	rollbackCalled := atomic.Int32{}
 
-	err := s.Write(context.Background(), &domain.SagaMsg{Value: make(chan int)}, nil, func() { rollbackCalled.Add(1) })
+	err := s.Write(context.Background(), nil, nil, func() { rollbackCalled.Add(1) })
 	require.Error(t, err)
 	require.Equal(t, int32(1), rollbackCalled.Load())
 }
@@ -73,7 +73,7 @@ func TestAsyncWriteSuccess(t *testing.T) {
 	s := &Saga{outTaskRepo: repo}
 	rollbackCalled := atomic.Int32{}
 
-	err := s.AsyncWrite(context.Background(), &domain.SagaMsg{Key: "k", Value: map[string]int{"a": 1}, Topic: "topic"}, nil, func() { rollbackCalled.Add(1) })
+	err := s.AsyncWrite(context.Background(), &domain.SagaMsg{Key: "k", Value: []byte(`{"a":1}`), Topic: "topic"}, nil, func() { rollbackCalled.Add(1) })
 	require.NoError(t, err)
 
 	done := make(chan struct{})
@@ -127,7 +127,7 @@ func TestAsyncWriteEarlyError(t *testing.T) {
 	s := &Saga{outTaskRepo: &stubTaskRepo{}}
 	rollbackCalled := atomic.Int32{}
 
-	err := s.AsyncWrite(context.Background(), &domain.SagaMsg{}, nil, func() { rollbackCalled.Add(1) })
+	err := s.AsyncWrite(context.Background(), nil, nil, func() { rollbackCalled.Add(1) })
 	require.EqualError(t, err, "rand fail")
 	require.Eventually(t, func() bool { return rollbackCalled.Load() == 1 }, time.Second, 10*time.Millisecond)
 }
@@ -141,7 +141,7 @@ func TestAsyncWriteRace5000(t *testing.T) {
 	s := &Saga{outTaskRepo: repo}
 
 	for i := 0; i < count; i++ {
-		err := s.AsyncWrite(context.Background(), &domain.SagaMsg{Key: "k", Value: map[string]int{"a": i}, Topic: "topic"}, &domain.SagaMsg{Key: "rb"}, func() {})
+		err := s.AsyncWrite(context.Background(), &domain.SagaMsg{Key: "k", Value: []byte(`{"a":1}`), Topic: "topic"}, &domain.SagaMsg{Key: "rb"}, func() {})
 		require.NoError(t, err)
 	}
 

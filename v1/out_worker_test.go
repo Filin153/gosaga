@@ -2,7 +2,6 @@ package gosaga
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
@@ -34,13 +33,12 @@ func TestOutWorkerSuccess(t *testing.T) {
 	writer := &captureWriter{}
 	worker := NewOutWorker(writer)
 
-	data, _ := json.Marshal(domain.SagaMsg{Key: "k", Value: map[string]int{"a": 1}, Topic: "t"})
-	rbData, _ := json.Marshal(domain.SagaMsg{Key: "rk", Value: map[string]int{"b": 2}, Topic: "rt"})
-	rawRB := json.RawMessage(rbData)
+	data, _ := domain.EncodeSagaMsg(&domain.SagaMsg{Key: "k", Value: []byte(`{"a":1}`), Topic: "t"})
+	rbData, _ := domain.EncodeSagaMsg(&domain.SagaMsg{Key: "rk", Value: []byte(`{"b":2}`), Topic: "rt"})
 	task := &domain.SagaTask{
 		IdempotencyKey: "id",
 		Data:           data,
-		RollbackData:   &rawRB,
+		RollbackData:   &rbData,
 	}
 
 	err := worker.Worker(context.Background(), task, nil)
@@ -60,8 +58,8 @@ func TestOutWorkerIgnoresInvalidRollback(t *testing.T) {
 	writer := &captureWriter{}
 	worker := NewOutWorker(writer)
 
-	data, _ := json.Marshal(domain.SagaMsg{Key: "k", Topic: "t"})
-	rawRB := json.RawMessage(`{invalid json}`)
+	data, _ := domain.EncodeSagaMsg(&domain.SagaMsg{Key: "k", Topic: "t"})
+	rawRB := []byte{0x02}
 	task := &domain.SagaTask{IdempotencyKey: "id", Data: data, RollbackData: &rawRB}
 
 	err := worker.Worker(context.Background(), task, nil)
@@ -76,7 +74,7 @@ func TestOutWorkerWriterError(t *testing.T) {
 	writer := &captureWriter{err: errors.New("writer boom")}
 	worker := NewOutWorker(writer)
 
-	data, _ := json.Marshal(domain.SagaMsg{Key: "k", Topic: "t"})
+	data, _ := domain.EncodeSagaMsg(&domain.SagaMsg{Key: "k", Topic: "t"})
 	task := &domain.SagaTask{IdempotencyKey: "id", Data: data}
 
 	err := worker.Worker(context.Background(), task, nil)

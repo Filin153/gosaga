@@ -3,7 +3,6 @@ package gosaga
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"os"
@@ -93,7 +92,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 		slog.Debug("Saga.RunWorkers: start Kafka->DB ingestion loop")
 		for msg := range s.kafkaReader.Read() {
 			var msgIdempotencyKey string
-			var rollbackData json.RawMessage
+			var rollbackData []byte
 
 			var msgIdempotencyKeyHave, rollbackDataHave bool
 			for _, header := range msg.Headers {
@@ -107,7 +106,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 				}
 
 				if string(header.Key) == "rollback_data" {
-					rollbackData = header.Value
+					rollbackData = append([]byte(nil), header.Value...)
 					rollbackDataHave = true
 				}
 			}
@@ -127,10 +126,15 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 			}
 
 			// тут добавлние в БД
+			var rollbackPayload *[]byte
+			if rollbackDataHave {
+				rollbackPayload = &rollbackData
+			}
+
 			sagaTaskData := domain.SagaTask{
 				IdempotencyKey: msgIdempotencyKey,
 				Data:           msg.Value,
-				RollbackData:   &rollbackData,
+				RollbackData:   rollbackPayload,
 			}
 			_, err = s.inTaskRepo.Create(ctx, &sagaTaskData)
 			if err != nil {
@@ -157,7 +161,6 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 				case <-ctx.Done():
 					return
 				default:
-					var rollBackMsg domain.SagaMsg
 					if task.Task.RollbackData == nil {
 						status := domain.TaskStatusErrorRollbackNone
 						err = s.inTaskRepo.UpdateByID(ctx, task.Task.ID, domain.SagaTaskUpdate{
@@ -170,13 +173,13 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 						continue
 					}
 
-					err := json.Unmarshal(*task.Task.RollbackData, &rollBackMsg)
+					rollBackMsg, err := domain.DecodeSagaMsg(*task.Task.RollbackData)
 					if err != nil {
-						slog.Error("Saga.RunWorkers: json.Unmarshal rollbackData", "error", err.Error(), "task_id", task.Task.ID)
+						slog.Error("Saga.RunWorkers: DecodeSagaMsg rollbackData", "error", err.Error(), "task_id", task.Task.ID)
 						continue
 					}
 
-					err = s.Write(ctx, &rollBackMsg, nil, func() {})
+					err = s.Write(ctx, rollBackMsg, nil, func() {})
 					if err != nil {
 						slog.Error("Saga.RunWorkers: Write rollback message", "error", err.Error())
 						continue
@@ -280,26 +283,25 @@ func (s *Saga) Write(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *doma
 		return err
 	}
 
-	jsonMarshal, err := json.Marshal(msg)
+	encoded, err := domain.EncodeSagaMsg(msg)
 	if err != nil {
-		slog.Error("Saga.Write: marshal msg error", "error", err.Error())
+		slog.Error("Saga.Write: EncodeSagaMsg error", "error", err.Error())
 		return err
 	}
 
-	var rollbackPayload *json.RawMessage
+	var rollbackPayload *[]byte
 	if rollbackMsg != nil {
-		rollbackDataMarshal, err := json.Marshal(rollbackMsg)
+		encodedRollback, err := domain.EncodeSagaMsg(rollbackMsg)
 		if err != nil {
-			slog.Error("Saga.Write: marshal rollbackMsg error", "error", err.Error())
+			slog.Error("Saga.Write: EncodeSagaMsg rollback error", "error", err.Error())
 			return err
 		}
-		raw := json.RawMessage(rollbackDataMarshal)
-		rollbackPayload = &raw
+		rollbackPayload = &encodedRollback
 	}
 
 	task := domain.SagaTask{
 		IdempotencyKey: idempotencyKey,
-		Data:           jsonMarshal,
+		Data:           encoded,
 		RollbackData:   rollbackPayload,
 	}
 	_, err = s.outTaskRepo.Create(ctx, &task)
@@ -326,24 +328,23 @@ func (s *Saga) AsyncWrite(ctx context.Context, msg *domain.SagaMsg, rollbackMsg 
 		return err
 	}
 
-	jsonMarshal, err := json.Marshal(msg)
+	encoded, err := domain.EncodeSagaMsg(msg)
 	if err != nil {
-		slog.Error("Saga.AsyncWrite: marshal msg error", "error", err.Error())
+		slog.Error("Saga.AsyncWrite: EncodeSagaMsg error", "error", err.Error())
 		return err
 	}
 
-	var rollbackPayload *json.RawMessage
+	var rollbackPayload *[]byte
 	if rollbackMsg != nil {
-		rollbackDataMarshal, err := json.Marshal(rollbackMsg)
+		encodedRollback, err := domain.EncodeSagaMsg(rollbackMsg)
 		if err != nil {
-			slog.Error("Saga.AsyncWrite: marshal rollbackMsg error", "error", err.Error())
+			slog.Error("Saga.AsyncWrite: EncodeSagaMsg rollback error", "error", err.Error())
 			return err
 		}
-		raw := json.RawMessage(rollbackDataMarshal)
-		rollbackPayload = &raw
+		rollbackPayload = &encodedRollback
 	}
 
-	go func(rollbackPayload *json.RawMessage) {
+	go func(rollbackPayload *[]byte) {
 		var err error
 		defer func() {
 			if err != nil {
@@ -354,7 +355,7 @@ func (s *Saga) AsyncWrite(ctx context.Context, msg *domain.SagaMsg, rollbackMsg 
 
 		task := domain.SagaTask{
 			IdempotencyKey: idempotencyKey,
-			Data:           jsonMarshal,
+			Data:           encoded,
 			RollbackData:   rollbackPayload,
 		}
 		_, err = s.outTaskRepo.Create(ctx, &task)

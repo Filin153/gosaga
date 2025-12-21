@@ -2,7 +2,6 @@ package kafka
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 
 	"github.com/Filin153/gosaga/domain"
@@ -31,11 +30,7 @@ func NewKafkaWriter(hosts []string, conf *sarama.Config) (*KafkaWriter, error) {
 
 func (k *KafkaWriter) Write(ctx context.Context, msg *domain.SagaMsg, rollback *domain.SagaMsg, idempotencyKey string) error {
 	slog.Debug("KafkaWriter.Write: start", "topic", msg.Topic, "key", msg.Key)
-	payload, err := json.Marshal(msg.Value)
-	if err != nil {
-		slog.Error("KafkaWriter.Write: marshal payload error", "error", err.Error())
-		return err
-	}
+	payload := msg.Value
 
 	headers := []sarama.RecordHeader{
 		{
@@ -44,9 +39,9 @@ func (k *KafkaWriter) Write(ctx context.Context, msg *domain.SagaMsg, rollback *
 		},
 	}
 	if rollback != nil {
-		rollbackBytes, err := json.Marshal(rollback)
+		rollbackBytes, err := domain.EncodeSagaMsg(rollback)
 		if err != nil {
-			slog.Error("KafkaWriter.Write: marshal rollback error", "error", err.Error())
+			slog.Error("KafkaWriter.Write: EncodeSagaMsg rollback error", "error", err.Error())
 			return err
 		}
 		headers = append(headers, sarama.RecordHeader{

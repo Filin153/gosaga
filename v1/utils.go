@@ -2,21 +2,19 @@ package gosaga
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"log/slog"
 
 	"github.com/Filin153/gosaga/domain"
 )
 
 func Unmarshal(task *domain.SagaTask) (*domain.SagaMsg, error) {
-	var msgData domain.SagaMsg
-	err := json.Unmarshal(task.Data, &msgData)
+	msgData, err := domain.DecodeSagaMsg(task.Data)
 	if err != nil {
-		slog.Error("json.Unmarshal", "error", err.Error())
+		slog.Error("DecodeSagaMsg", "error", err.Error())
 		return nil, err
 	}
 
-	return &msgData, nil
+	return msgData, nil
 }
 
 // generateIdempotencyKey produces a random hex string used to deduplicate tasks.

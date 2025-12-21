@@ -3,7 +3,6 @@ package pg
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -226,7 +225,7 @@ func (r *dlqPgRepository) GetByStatus(ctx context.Context, status domain.TaskSta
 			var (
 				entry    domain.DLQEntry
 				info     sql.NullString
-				rollback sql.NullString
+				rollback []byte
 			)
 			if err := row.Scan(
 				&entry.Task.ID,
@@ -249,9 +248,8 @@ func (r *dlqPgRepository) GetByStatus(ctx context.Context, status domain.TaskSta
 			if info.Valid {
 				entry.Task.Info = &info.String
 			}
-			if rollback.Valid {
-				raw := json.RawMessage(rollback.String)
-				entry.Task.RollbackData = &raw
+			if rollback != nil {
+				entry.Task.RollbackData = &rollback
 			}
 			return entry, nil
 		})
@@ -293,7 +291,7 @@ func (r *dlqPgRepository) GetByStatus(ctx context.Context, status domain.TaskSta
 		var (
 			entry    domain.DLQEntry
 			info     sql.NullString
-			rollback sql.NullString
+			rollback []byte
 		)
 		if err := row.Scan(
 			&entry.DLQ.ID,
@@ -316,9 +314,8 @@ func (r *dlqPgRepository) GetByStatus(ctx context.Context, status domain.TaskSta
 		if info.Valid {
 			entry.Task.Info = &info.String
 		}
-		if rollback.Valid {
-			raw := json.RawMessage(rollback.String)
-			entry.Task.RollbackData = &raw
+		if rollback != nil {
+			entry.Task.RollbackData = &rollback
 		}
 		return entry, nil
 	})
@@ -353,7 +350,7 @@ func (r *dlqPgRepository) GetErrorsWithAttempts(ctx context.Context) ([]domain.D
 		var (
 			entry    domain.DLQEntry
 			info     sql.NullString
-			rollback sql.NullString
+			rollback []byte
 		)
 		if err := row.Scan(
 			&entry.DLQ.ID,
@@ -376,9 +373,8 @@ func (r *dlqPgRepository) GetErrorsWithAttempts(ctx context.Context) ([]domain.D
 		if info.Valid {
 			entry.Task.Info = &info.String
 		}
-		if rollback.Valid {
-			raw := json.RawMessage(rollback.String)
-			entry.Task.RollbackData = &raw
+		if rollback != nil {
+			entry.Task.RollbackData = &rollback
 		}
 		return entry, nil
 	})
