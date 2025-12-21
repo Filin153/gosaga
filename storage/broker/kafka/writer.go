@@ -31,11 +31,6 @@ func NewKafkaWriter(hosts []string, conf *sarama.Config) (*KafkaWriter, error) {
 
 func (k *KafkaWriter) Write(ctx context.Context, msg *domain.SagaMsg, rollback *domain.SagaMsg, idempotencyKey string) error {
 	slog.Debug("KafkaWriter.Write: start", "topic", msg.Topic, "key", msg.Key)
-	payload, err := json.Marshal(msg.Value)
-	if err != nil {
-		slog.Error("KafkaWriter.Write: marshal payload error", "error", err.Error())
-		return err
-	}
 
 	headers := []sarama.RecordHeader{
 		{
@@ -58,7 +53,7 @@ func (k *KafkaWriter) Write(ctx context.Context, msg *domain.SagaMsg, rollback *
 	message := &sarama.ProducerMessage{
 		Topic:   msg.Topic,
 		Key:     sarama.StringEncoder(msg.Key),
-		Value:   sarama.ByteEncoder(payload),
+		Value:   sarama.ByteEncoder(msg.Value),
 		Headers: headers,
 	}
 

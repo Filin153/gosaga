@@ -76,8 +76,8 @@ func main() {
 	}
 
 	// write outgoing task to out-topic
-	_ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "test-1"}, nil, func() {})
-	_ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "test-2"}, &gosaga.SagaMsg{Key: "rollback-k", Value: map[string]any{"foo": "rollback_data"}, Topic: "test-2-rollback_data"}, func() {})
+	_ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: []byte(`{"foo":"bar"}`), Topic: "test-1"}, nil, func() {})
+	_ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: []byte(`{"foo":"bar"}`), Topic: "test-2"}, &gosaga.SagaMsg{Key: "rollback-k", Value: []byte(`{"foo":"rollback_data"}`), Topic: "test-2-rollback_data"}, func() {})
 
 	// block until signal
 	<-ctx.Done()
@@ -184,8 +184,8 @@ func main() {
 	}
 
 	// write outgoing task to out-topic
-	_ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "test-1"}, nil, func() {})
-	_ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: map[string]any{"foo": "bar"}, Topic: "test-2"}, &gosaga.SagaMsg{Key: "rollback-k", Value: map[string]any{"foo": "rollback_data"}, Topic: "test-2-rollback_data"}, func() {})
+	_ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: []byte(`{"foo":"bar"}`), Topic: "test-1"}, nil, func() {})
+	_ = saga.Write(ctx, &gosaga.SagaMsg{Key: "k", Value: []byte(`{"foo":"bar"}`), Topic: "test-2"}, &gosaga.SagaMsg{Key: "rollback-k", Value: []byte(`{"foo":"rollback_data"}`), Topic: "test-2-rollback_data"}, func() {})
 
 	// block until signal
 	<-ctx.Done()

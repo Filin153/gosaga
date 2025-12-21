@@ -12,11 +12,14 @@ import (
 )
 
 func TestUnmarshal(t *testing.T) {
-	task := domain.SagaTask{Data: json.RawMessage(`{"Key":"k","Value":{"a":1},"Topic":"t"}`)}
+	payload := []byte(`{"a":1}`)
+	data, _ := json.Marshal(domain.SagaMsg{Key: "k", Value: payload, Topic: "t"})
+	task := domain.SagaTask{Data: json.RawMessage(data)}
 	msg, err := Unmarshal(&task)
 	require.NoError(t, err)
 	require.Equal(t, "k", msg.Key)
 	require.Equal(t, "t", msg.Topic)
+	require.Equal(t, payload, msg.Value)
 }
 
 func TestUnmarshalError(t *testing.T) {
