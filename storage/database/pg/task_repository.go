@@ -52,10 +52,15 @@ func (r *taskPgRepository) Create(ctx context.Context, task *domain.SagaTask) (i
 		RETURNING "id", "updated_at";
 	`, r.table)
 
+	var rollback any
+	if task.RollbackData != nil {
+		rollback = []byte(*task.RollbackData)
+	}
+
 	err := r.db.QueryRow(ctx, query,
 		task.IdempotencyKey,
-		task.Data,
-		task.RollbackData,
+		[]byte(task.Data),
+		rollback,
 	).Scan(&task.ID, &task.UpdatedAt)
 	if err != nil {
 		return 0, err
@@ -74,7 +79,7 @@ func (r *taskPgRepository) GetByID(ctx context.Context, id int64) (*domain.SagaT
 	var (
 		task     domain.SagaTask
 		info     sql.NullString
-		rollback sql.NullString
+		rollback []byte
 	)
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
@@ -93,8 +98,8 @@ func (r *taskPgRepository) GetByID(ctx context.Context, id int64) (*domain.SagaT
 	if info.Valid {
 		task.Info = &info.String
 	}
-	if rollback.Valid {
-		raw := json.RawMessage(rollback.String)
+	if rollback != nil {
+		raw := json.RawMessage(rollback)
 		task.RollbackData = &raw
 	}
 
@@ -111,7 +116,7 @@ func (r *taskPgRepository) GetByIdempotencyKey(ctx context.Context, key string) 
 	var (
 		task     domain.SagaTask
 		info     sql.NullString
-		rollback sql.NullString
+		rollback []byte
 	)
 
 	err := r.db.QueryRow(ctx, query, key).Scan(
@@ -130,8 +135,8 @@ func (r *taskPgRepository) GetByIdempotencyKey(ctx context.Context, key string) 
 	if info.Valid {
 		task.Info = &info.String
 	}
-	if rollback.Valid {
-		raw := json.RawMessage(rollback.String)
+	if rollback != nil {
+		raw := json.RawMessage(rollback)
 		task.RollbackData = &raw
 	}
 
@@ -195,7 +200,7 @@ func (r *taskPgRepository) GetByStatus(ctx context.Context, status domain.TaskSt
 			var (
 				task     domain.SagaTask
 				info     sql.NullString
-				rollback sql.NullString
+				rollback []byte
 			)
 			if err := row.Scan(
 				&task.ID,
@@ -211,8 +216,8 @@ func (r *taskPgRepository) GetByStatus(ctx context.Context, status domain.TaskSt
 			if info.Valid {
 				task.Info = &info.String
 			}
-			if rollback.Valid {
-				raw := json.RawMessage(rollback.String)
+			if rollback != nil {
+				raw := json.RawMessage(rollback)
 				task.RollbackData = &raw
 			}
 			return task, nil
@@ -239,7 +244,7 @@ func (r *taskPgRepository) GetByStatus(ctx context.Context, status domain.TaskSt
 		var (
 			task     domain.SagaTask
 			info     sql.NullString
-			rollback sql.NullString
+			rollback []byte
 		)
 		if err := row.Scan(
 			&task.ID,
@@ -255,8 +260,8 @@ func (r *taskPgRepository) GetByStatus(ctx context.Context, status domain.TaskSt
 		if info.Valid {
 			task.Info = &info.String
 		}
-		if rollback.Valid {
-			raw := json.RawMessage(rollback.String)
+		if rollback != nil {
+			raw := json.RawMessage(rollback)
 			task.RollbackData = &raw
 		}
 		return task, nil
