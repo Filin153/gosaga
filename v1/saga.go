@@ -126,10 +126,20 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 				continue
 			}
 
+			sagaMsgByteData, err := json.Marshal(domain.SagaMsg{
+				Key:   string(msg.Key),
+				Topic: msg.Topic,
+				Value: msg.Value,
+			})
+			if err != nil {
+				slog.Error("Saga.RunWorkers: json.Marshal", "error", err.Error(), "idempotency_key", msgIdempotencyKey)
+				continue
+			}
+
 			// тут добавлние в БД
 			sagaTaskData := domain.SagaTask{
 				IdempotencyKey: msgIdempotencyKey,
-				Data:           msg.Value,
+				Data:           sagaMsgByteData,
 				RollbackData:   &rollbackData,
 			}
 			_, err = s.inTaskRepo.Create(ctx, &sagaTaskData)

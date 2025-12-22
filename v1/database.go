@@ -16,7 +16,10 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 	taskMsg := make(chan *domain.SagaTask)
 	go func() {
 		defer close(taskMsg)
-		waitTime := 1
+		errWait := 1
+		maxErrorWait := 30
+		idleWait := 200 * time.Millisecond
+		maxIdleWait := 5 * time.Second
 		for {
 			select {
 			case <-ctx.Done():
@@ -27,8 +30,11 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 				})
 				if err != nil {
 					slog.Error("pool.BeginTx", "error", err.Error())
-					sleep(time.Duration(waitTime) * time.Second)
-					waitTime *= 2
+					sleep(time.Duration(errWait) * time.Second)
+					errWait *= 2
+					if errWait > maxErrorWait {
+						errWait = maxErrorWait
+					}
 					continue
 				}
 
@@ -38,8 +44,11 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 					if err := tx.Rollback(ctx); err != nil {
 						slog.Error("dataBaseTaskReader: GetByStatus error, rollback", "error", err.Error())
 					}
-					sleep(time.Duration(waitTime) * time.Second)
-					waitTime *= 2
+					sleep(time.Duration(errWait) * time.Second)
+					errWait *= 2
+					if errWait > maxErrorWait {
+						errWait = maxErrorWait
+					}
 					continue
 				}
 
@@ -48,11 +57,26 @@ func (s *Saga) dataBaseTaskReader(ctx context.Context, repo database.TaskReposit
 					if err := tx.Rollback(ctx); err != nil {
 						slog.Error("dataBaseTaskReader: tx.Commit error, rollback", "error", err.Error())
 					}
-					sleep(time.Duration(waitTime) * time.Second)
-					waitTime *= 2
+					sleep(time.Duration(errWait) * time.Second)
+					errWait *= 2
+					if errWait > maxErrorWait {
+						errWait = maxErrorWait
+					}
 					continue
 				}
-				waitTime = 1
+				errWait = 1
+
+				if len(data) == 0 {
+					sleep(idleWait)
+					if idleWait < maxIdleWait {
+						idleWait *= 2
+						if idleWait > maxIdleWait {
+							idleWait = maxIdleWait
+						}
+					}
+					continue
+				}
+				idleWait = 200 * time.Millisecond
 
 				for _, item := range data {
 					select {
@@ -79,7 +103,10 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 	taskMsg := make(chan *domain.SagaTask)
 	go func() {
 		defer close(taskMsg)
-		waitTime := 1
+		errWait := 1
+		maxErrorWait := 30
+		idleWait := 200 * time.Millisecond
+		maxIdleWait := 5 * time.Second
 		for {
 			select {
 			case <-ctx.Done():
@@ -90,8 +117,11 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 				})
 				if err != nil {
 					slog.Error("dataBaseDLQTaskReader: pool.BeginTx error", "error", err.Error())
-					sleep(time.Duration(waitTime) * time.Second)
-					waitTime *= 2
+					sleep(time.Duration(errWait) * time.Second)
+					errWait *= 2
+					if errWait > maxErrorWait {
+						errWait = maxErrorWait
+					}
 					continue
 				}
 
@@ -101,8 +131,11 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 					if err := tx.Rollback(ctx); err != nil {
 						slog.Error("dataBaseDLQTaskReader: GetByStatus error, rollback", "error", err.Error())
 					}
-					sleep(time.Duration(waitTime) * time.Second)
-					waitTime *= 2
+					sleep(time.Duration(errWait) * time.Second)
+					errWait *= 2
+					if errWait > maxErrorWait {
+						errWait = maxErrorWait
+					}
 					continue
 				}
 
@@ -111,11 +144,26 @@ func (s *Saga) dataBaseDLQTaskReader(ctx context.Context, repo database.DLQRepos
 					if err := tx.Rollback(ctx); err != nil {
 						slog.Error("dataBaseDLQTaskReader: tx.Commit error, rollback", "error", err.Error())
 					}
-					sleep(time.Duration(waitTime) * time.Second)
-					waitTime *= 2
+					sleep(time.Duration(errWait) * time.Second)
+					errWait *= 2
+					if errWait > maxErrorWait {
+						errWait = maxErrorWait
+					}
 					continue
 				}
-				waitTime = 1
+				errWait = 1
+
+				if len(data) == 0 {
+					sleep(idleWait)
+					if idleWait < maxIdleWait {
+						idleWait *= 2
+						if idleWait > maxIdleWait {
+							idleWait = maxIdleWait
+						}
+					}
+					continue
+				}
+				idleWait = 200 * time.Millisecond
 
 				for _, item := range data {
 					select {

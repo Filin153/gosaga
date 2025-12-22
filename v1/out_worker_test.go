@@ -34,8 +34,11 @@ func TestOutWorkerSuccess(t *testing.T) {
 	writer := &captureWriter{}
 	worker := NewOutWorker(writer)
 
-	data, _ := json.Marshal(domain.SagaMsg{Key: "k", Value: map[string]int{"a": 1}, Topic: "t"})
-	rbData, _ := json.Marshal(domain.SagaMsg{Key: "rk", Value: map[string]int{"b": 2}, Topic: "rt"})
+	payload := []byte(`{"a":1}`)
+	rollbackPayload := []byte(`{"b":2}`)
+
+	data, _ := json.Marshal(domain.SagaMsg{Key: "k", Value: payload, Topic: "t"})
+	rbData, _ := json.Marshal(domain.SagaMsg{Key: "rk", Value: rollbackPayload, Topic: "rt"})
 	rawRB := json.RawMessage(rbData)
 	task := &domain.SagaTask{
 		IdempotencyKey: "id",
@@ -51,8 +54,10 @@ func TestOutWorkerSuccess(t *testing.T) {
 	require.Equal(t, "id", writer.idempotency)
 	require.Equal(t, "k", writer.msg.Key)
 	require.Equal(t, "t", writer.msg.Topic)
+	require.Equal(t, payload, writer.msg.Value)
 	require.NotNil(t, writer.rollback)
 	require.Equal(t, "rk", writer.rollback.Key)
+	require.Equal(t, rollbackPayload, writer.rollback.Value)
 	writer.mu.Unlock()
 }
 

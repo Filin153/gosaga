@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -120,6 +121,10 @@ func (r *dlqPgRepository) GetByTaskID(ctx context.Context, taskID int64) (*domai
 		&task.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			slog.Debug("dlqPgRepository.GetByTaskID: not found", "dlq_table", r.dlqTable, "task_id", taskID)
+			return nil, nil
+		}
 		slog.Error("dlqPgRepository.GetByTaskID: query error", "error", err.Error(), "dlq_table", r.dlqTable, "task_id", taskID)
 		return nil, err
 	}

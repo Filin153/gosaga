@@ -19,7 +19,7 @@ const (
 
 type SagaMsg struct {
 	Key   string
-	Value any
+	Value []byte
 	Topic string
 }
 
