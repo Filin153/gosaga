@@ -12,13 +12,6 @@ import (
 
 // outWork executes outbound task handler inside transaction, managing statuses and DLQ.
 func (s *Saga) outWork(ctx context.Context, task *domain.SagaTask, do func(ctx context.Context, task *domain.SagaTask, sess database.Session) error) error {
-	if task.ID == 0 {
-		_, err := s.outTaskRepo.Create(ctx, task)
-		if err != nil {
-			return err
-		}
-	}
-
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		slog.Error("outWork: pool.BeginTx", "error", err.Error(), "task_id", task.ID)
@@ -111,13 +104,6 @@ func (s *Saga) outWork(ctx context.Context, task *domain.SagaTask, do func(ctx c
 
 // inWork executes inbound task handler with status updates and DLQ fallback.
 func (s *Saga) inWork(ctx context.Context, task *domain.SagaTask, do func(ctx context.Context, task *domain.SagaTask, sess database.Session) error) error {
-	if task.ID == 0 {
-		_, err := s.inTaskRepo.Create(ctx, task)
-		if err != nil {
-			return err
-		}
-	}
-
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		slog.Error("inWork: pool.BeginTx", "error", err.Error(), "task_id", task.ID)
