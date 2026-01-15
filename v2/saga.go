@@ -34,6 +34,8 @@ type Saga struct {
 	dlqOutTaskRepo database.DLQRepository
 	kafkaReader    kafka.Reader
 	kafkaWriter    kafka.Writer
+	inputTasks     chan *domain.SagaTask
+	outTasks       chan *domain.SagaTask
 }
 
 //go:embed pg-migration.sql
@@ -41,7 +43,7 @@ var migrationSQL string
 
 // NewSaga initializes repositories, runs DB migration, and starts Kafka reader.
 // logLevel controls slog verbosity for all logs produced by gosaga.
-func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, readerTopics, hosts []string, conf *sarama.Config, logLevel slog.Leveler) (*Saga, error) {
+func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, readerTopics, hosts []string, conf *sarama.Config, msgBuffer int, logLevel slog.Leveler) (*Saga, error) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: logLevel,
 	}))
@@ -76,6 +78,8 @@ func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, reader
 		dlqOutTaskRepo: pg.NewDLQOutTaskRepository(ctx, pool),
 		kafkaWriter:    kafkaWriter,
 		kafkaReader:    kafkaReader,
+		inputTasks:     make(chan *domain.SagaTask, msgBuffer),
+		outTasks:       make(chan *domain.SagaTask, msgBuffer),
 	}, nil
 }
 
@@ -136,16 +140,26 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 				continue
 			}
 
-			// тут добавлние в БД
-			sagaTaskData := domain.SagaTask{
+			sagaTaskData := &domain.SagaTask{
 				IdempotencyKey: msgIdempotencyKey,
 				Data:           sagaMsgByteData,
 				RollbackData:   &rollbackData,
 			}
-			_, err = s.inTaskRepo.Create(ctx, &sagaTaskData)
+
+			_, err = s.inTaskRepo.Create(ctx, sagaTaskData)
 			if err != nil {
-				slog.Error("Saga.RunWorkers: inTaskRepo.Create", "error", err.Error(), "idempotency_key", msgIdempotencyKey)
-				continue
+				slog.Error("Saga.RunWorkers: inTaskRepo.Create", "error", err.Error(), "idempotency_key", sagaTaskData.IdempotencyKey)
+				return
+			}
+
+			if s.inputTasks != nil {
+				select {
+				case s.inputTasks <- sagaTaskData:
+				default:
+					go func(task *domain.SagaTask) {
+						s.inputTasks <- task
+					}(sagaTaskData)
+				}
 			}
 		}
 	}()
@@ -208,7 +222,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 	// InTask
 	go func() {
 		slog.Debug("Saga.RunWorkers: start InTask loop")
-		inTasksMsgChan := s.dataBaseTaskReader(ctx, s.inTaskRepo)
+		inTasksMsgChan := s.dataBaseTaskReader(ctx, s.inTaskRepo, s.inputTasks)
 		for task := range inTasksMsgChan {
 			select {
 			case <-ctx.Done():
@@ -242,7 +256,7 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 	// OutTask
 	go func() {
 		slog.Debug("Saga.RunWorkers: start OutTask loop")
-		outTasksMsgChan := s.dataBaseTaskReader(ctx, s.outTaskRepo)
+		outTasksMsgChan := s.dataBaseTaskReader(ctx, s.outTaskRepo, s.outTasks)
 		for task := range outTasksMsgChan {
 			select {
 			case <-ctx.Done():
@@ -307,15 +321,26 @@ func (s *Saga) Write(ctx context.Context, msg *domain.SagaMsg, rollbackMsg *doma
 		rollbackPayload = &raw
 	}
 
-	task := domain.SagaTask{
+	task := &domain.SagaTask{
 		IdempotencyKey: idempotencyKey,
 		Data:           jsonMarshal,
 		RollbackData:   rollbackPayload,
 	}
-	_, err = s.outTaskRepo.Create(ctx, &task)
+
+	_, err = s.outTaskRepo.Create(ctx, task)
 	if err != nil {
 		slog.Error("Saga.Write: outTaskRepo.Create error", "error", err.Error())
 		return err
+	}
+
+	if s.outTasks != nil {
+		select {
+		case s.outTasks <- task:
+		default:
+			go func(task *domain.SagaTask) {
+				s.outTasks <- task
+			}(task)
+		}
 	}
 
 	slog.Debug("Saga.Write: success")
@@ -353,25 +378,37 @@ func (s *Saga) AsyncWrite(ctx context.Context, msg *domain.SagaMsg, rollbackMsg 
 		rollbackPayload = &raw
 	}
 
-	go func(rollbackPayload *json.RawMessage) {
-		var err error
+	go func(rollbackPayload *json.RawMessage, idempotencyKey string, jsonMarshal []byte) {
+		var createErr error
 		defer func() {
-			if err != nil {
-				slog.Error("Saga.AsyncWrite goroutine: error, calling rollback", "error", err.Error())
+			if createErr != nil {
+				slog.Error("Saga.AsyncWrite goroutine: error, calling rollback", "error", createErr.Error())
 				go rollbackFunc()
 			}
 		}()
 
-		task := domain.SagaTask{
+		task := &domain.SagaTask{
 			IdempotencyKey: idempotencyKey,
 			Data:           jsonMarshal,
 			RollbackData:   rollbackPayload,
 		}
-		_, err = s.outTaskRepo.Create(ctx, &task)
-		if err != nil {
-			slog.Error("AsyncWrite go func()", "error", err.Error())
+
+		_, createErr = s.outTaskRepo.Create(ctx, task)
+		if createErr != nil {
+			slog.Error("Saga.AsyncWrite: outTaskRepo.Create error", "error", createErr.Error())
+			return
 		}
-	}(rollbackPayload)
+
+		if s.outTasks != nil {
+			select {
+			case s.outTasks <- task:
+			default:
+				go func(task *domain.SagaTask) {
+					s.outTasks <- task
+				}(task)
+			}
+		}
+	}(rollbackPayload, idempotencyKey, jsonMarshal)
 
 	return nil
 }

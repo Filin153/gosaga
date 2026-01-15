@@ -19,14 +19,18 @@ func TestDataBaseTaskReaderDeliversAndStops(t *testing.T) {
 	tx := &fakeTx{}
 	pool := &fakePool{tx: tx}
 	repo := &stubTaskRepo{
-		getByStatusResp: []domain.SagaTask{{ID: 1}, {ID: 2}},
+		getByStatusSeq: [][]domain.SagaTask{
+			{{ID: 1}, {ID: 2}},
+			{},
+		},
 	}
 	s := &Saga{pool: pool}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch := s.dataBaseTaskReader(ctx, repo)
+	taskMsg := make(chan *domain.SagaTask, 2)
+	ch := s.dataBaseTaskReader(ctx, repo, taskMsg)
 	var ids []int64
 	for task := range ch {
 		ids = append(ids, task.ID)
@@ -49,14 +53,18 @@ func TestDataBaseTaskReaderRetryOnError(t *testing.T) {
 	pool := &fakePool{tx: tx}
 	repo := &stubTaskRepo{
 		getByStatusErrs: []error{errors.New("first fail")},
-		getByStatusResp: []domain.SagaTask{{ID: 7}},
+		getByStatusSeq: [][]domain.SagaTask{
+			{{ID: 7}},
+			{},
+		},
 	}
 	s := &Saga{pool: pool}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch := s.dataBaseTaskReader(ctx, repo)
+	taskMsg := make(chan *domain.SagaTask, 1)
+	ch := s.dataBaseTaskReader(ctx, repo, taskMsg)
 	select {
 	case task := <-ch:
 		require.Equal(t, int64(7), task.ID)
@@ -77,9 +85,12 @@ func TestDataBaseDLQTaskReader(t *testing.T) {
 	tx := &fakeTx{}
 	pool := &fakePool{tx: tx}
 	repo := &stubDLQRepo{
-		getByStatusResp: []domain.DLQEntry{
-			{Task: domain.SagaTask{ID: 11}},
-			{Task: domain.SagaTask{ID: 12}},
+		getByStatusSeq: [][]domain.DLQEntry{
+			{
+				{Task: domain.SagaTask{ID: 11}},
+				{Task: domain.SagaTask{ID: 12}},
+			},
+			{},
 		},
 	}
 	s := &Saga{pool: pool}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/Filin153/gosaga/storage/database"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -58,6 +60,16 @@ func (r *taskPgRepository) Create(ctx context.Context, task *domain.SagaTask) (i
 		task.RollbackData,
 	).Scan(&task.ID, &task.UpdatedAt)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			existing, getErr := r.GetByIdempotencyKey(ctx, task.IdempotencyKey)
+			if getErr != nil {
+				return 0, getErr
+			}
+			task.ID = existing.ID
+			task.UpdatedAt = existing.UpdatedAt
+			return task.ID, nil
+		}
 		return 0, err
 	}
 
