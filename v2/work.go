@@ -102,7 +102,7 @@ func (s *Saga) outWork(ctx context.Context, task *domain.SagaTask, do func(ctx c
 	return nil
 }
 
-// inWork executes inbound task handler with status updates and DLQ fallback.
+// inWork executes inbound task handler with status updates only.
 func (s *Saga) inWork(ctx context.Context, task *domain.SagaTask, do func(ctx context.Context, task *domain.SagaTask, sess database.Session) error) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -112,7 +112,6 @@ func (s *Saga) inWork(ctx context.Context, task *domain.SagaTask, do func(ctx co
 	defer tx.Rollback(ctx)
 
 	inTaskRepoWithSession := s.inTaskRepo.WithSession(tx)
-	dlqInTaskRepoWithSession := s.dlqInTaskRepo.WithSession(tx)
 
 	info := "Start"
 	status := domain.TaskStatusWork
@@ -146,22 +145,6 @@ func (s *Saga) inWork(ctx context.Context, task *domain.SagaTask, do func(ctx co
 		if err != nil {
 			slog.Error("inWork: inTaskRepo.UpdateByID (set error)", "error", err.Error(), "task_id", task.ID)
 			return err
-		}
-
-		dlqTask, err := dlqInTaskRepoWithSession.GetByTaskID(ctx, task.ID)
-		if err != nil {
-			return err
-		}
-
-		if dlqTask == nil {
-			newDlqTask := domain.DLQTask{
-				TaskID: task.ID,
-			}
-			_, err := dlqInTaskRepoWithSession.Create(ctx, &newDlqTask)
-			if err != nil {
-				slog.Error("inWork: dlqInTaskRepo.Create", "error", err.Error(), "task_id", task.ID)
-				return err
-			}
 		}
 
 		if err := tx.Commit(ctx); err != nil {

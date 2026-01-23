@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/Filin153/gosaga/domain"
 	"github.com/Filin153/gosaga/storage/broker/kafka"
@@ -30,7 +29,6 @@ type Saga struct {
 	pool           txBeginner
 	inTaskRepo     database.TaskRepository
 	outTaskRepo    database.TaskRepository
-	dlqInTaskRepo  database.DLQRepository
 	dlqOutTaskRepo database.DLQRepository
 	kafkaReader    kafka.Reader
 	kafkaWriter    kafka.Writer
@@ -74,7 +72,6 @@ func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, reader
 		pool:           pool,
 		inTaskRepo:     pg.NewInTaskRepository(ctx, pool),
 		outTaskRepo:    pg.NewOutTaskRepository(ctx, pool),
-		dlqInTaskRepo:  pg.NewDLQInTaskRepository(ctx, pool),
 		dlqOutTaskRepo: pg.NewDLQOutTaskRepository(ctx, pool),
 		kafkaWriter:    kafkaWriter,
 		kafkaReader:    kafkaReader,
@@ -83,14 +80,13 @@ func NewSaga(ctx context.Context, pool *pgxpool.Pool, readerGroup string, reader
 	}, nil
 }
 
-// RunWorkers spins up workers for in/out tasks and their DLQ counterparts.
-// limiter caps concurrency per stream; total goroutines up to limiter*4.
+// RunWorkers spins up workers for in/out tasks and DLQ for out tasks.
+// limiter caps concurrency per stream; total goroutines up to limiter*3.
 func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerInterface, newInWorker WorkerInterface) error {
 	slog.Info("Saga.RunWorkers: start", "limiter", limiter)
 	OutTaskWorkerCountLimiter := make(chan struct{}, limiter)
 	dlqOutTaskWorkerCountLimiter := make(chan struct{}, limiter)
 	InTaskWorkerCountLimiter := make(chan struct{}, limiter)
-	dlqInTaskWorkerCountLimiter := make(chan struct{}, limiter)
 
 	// Create task in database
 	go func() {
@@ -164,61 +160,6 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 		}
 	}()
 
-	// RollBack
-	go func() {
-		slog.Debug("Saga.RunWorkers: start rollback loop")
-		for {
-			time.Sleep(10 * time.Second)
-
-			errTasks, err := s.dlqInTaskRepo.GetErrorsWithAttempts(ctx)
-			if err != nil {
-				slog.Error("Saga.RunWorkers: dlqInTaskRepo.GetErrorsWithAttempts", "error", err.Error())
-				continue
-			}
-
-			for _, task := range errTasks {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					var rollBackMsg domain.SagaMsg
-					if task.Task.RollbackData == nil {
-						status := domain.TaskStatusErrorRollbackNone
-						err = s.inTaskRepo.UpdateByID(ctx, task.Task.ID, domain.SagaTaskUpdate{
-							Status: &status,
-						})
-						if err != nil {
-							slog.Error("Saga.RunWorkers: inTaskRepo.UpdateByID (no rollback data)", "error", err.Error(), "task_id", task.Task.ID)
-							continue
-						}
-						continue
-					}
-
-					err := json.Unmarshal(*task.Task.RollbackData, &rollBackMsg)
-					if err != nil {
-						slog.Error("Saga.RunWorkers: json.Unmarshal rollbackData", "error", err.Error(), "task_id", task.Task.ID)
-						continue
-					}
-
-					err = s.Write(ctx, &rollBackMsg, nil, func() {})
-					if err != nil {
-						slog.Error("Saga.RunWorkers: Write rollback message", "error", err.Error())
-						continue
-					}
-
-					status := domain.TaskStatusRollback
-					err = s.inTaskRepo.UpdateByID(ctx, task.Task.ID, domain.SagaTaskUpdate{
-						Status: &status,
-					})
-					if err != nil {
-						slog.Error("Saga.RunWorkers: inTaskRepo.UpdateByID (set rollback)", "error", err.Error(), "task_id", task.Task.ID)
-						continue
-					}
-				}
-			}
-		}
-	}()
-
 	// InTask
 	go func() {
 		slog.Debug("Saga.RunWorkers: start InTask loop")
@@ -232,23 +173,6 @@ func (s *Saga) RunWorkers(ctx context.Context, limiter int, newOutWorker WorkerI
 			go func(task *domain.SagaTask) {
 				defer func() { <-InTaskWorkerCountLimiter }()
 				_ = s.inWork(ctx, task, newInWorker.Worker)
-			}(task)
-		}
-	}()
-
-	// DlqInTask
-	go func() {
-		slog.Debug("Saga.RunWorkers: start DlqInTask loop")
-		dlqInTasksMsgChan := s.dataBaseDLQTaskReader(ctx, s.dlqInTaskRepo)
-		for task := range dlqInTasksMsgChan {
-			select {
-			case <-ctx.Done():
-				return
-			case dlqInTaskWorkerCountLimiter <- struct{}{}:
-			}
-			go func(task *domain.SagaTask) {
-				defer func() { <-dlqInTaskWorkerCountLimiter }()
-				_ = s.inWork(ctx, task, newInWorker.DlqWorker)
 			}(task)
 		}
 	}()

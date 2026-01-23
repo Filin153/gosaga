@@ -116,14 +116,14 @@ func TestOutWorkBeginTxError(t *testing.T) {
 	require.EqualError(t, err, "begin fail")
 }
 
-func TestInWorkMirrorsOutWork(t *testing.T) {
+func TestInWorkErrorDoesNotCreateDLQ(t *testing.T) {
 	taskRepo := &stubTaskRepo{}
 	dlqRepo := &stubDLQRepo{}
 	tx := &fakeTx{}
 	s := &Saga{
-		pool:          &fakePool{tx: tx},
-		inTaskRepo:    taskRepo,
-		dlqInTaskRepo: dlqRepo,
+		pool:           &fakePool{tx: tx},
+		inTaskRepo:     taskRepo,
+		dlqOutTaskRepo: dlqRepo,
 	}
 
 	task := &domain.SagaTask{ID: 10}
@@ -132,7 +132,7 @@ func TestInWorkMirrorsOutWork(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, tx.committed)
-	require.Len(t, dlqRepo.created, 1)
+	require.Empty(t, dlqRepo.created)
 
 	taskRepo.mu.Lock()
 	require.Equal(t, domain.TaskStatusWork, taskRepo.updates[0].status)
